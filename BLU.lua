@@ -656,7 +656,7 @@ profile.HandleMidcast = function()
         end
     elseif (action.Skill == 'Blue Magic') then
         if (BluMagBuff:contains(action.Name)) then
-            gFunc.EquipSet('CMP') -- non-skill-scaling buffs (Refueling, Plasma Charge, etc.)
+            gFunc.EquipSet('ConserveMP') -- non-skill-scaling buffs (Refueling, Plasma Charge, etc.)
         elseif (BluMagSkill:contains(action.Name)) then
             gFunc.EquipSet('BluSkill') -- skill-scaling buffs/defenses (e.g. Zephyr Mantle)
         elseif (BluMagDebuff:contains(action.Name)) then
