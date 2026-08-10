@@ -6,7 +6,7 @@ This LUA has been tested, but there is absolutely a possibility I missed certain
 
 **Now some disclaimers:**
 - Claude did a lot of the work in creating the BLU.lua so there is absolutely a possibility of redundant code, weird workarounds for problems, etc. 
-- This file is based off of the 3.0.5 version of Rag's files. He continues to make updates, though, but from what I can tell, unless Rag makes some big logic changes (unlikely), later versions are likely to work as well.
+- This file is based off of the 3.0.5 version of Rag's files. You need to be on at least 3.0.0 I believe. He continues to make updates, though, but from what I can tell, unless Rag makes some big logic changes (unlikely), later versions are likely to work as well.
 - Please understand that things absolutely could break or not function properly. But for now, at least in testing, everything appears to be working. If you find something that isn't working, feel free to share it with me and/or share the fix if you fix it.
 - This is all based on era knowledge of BLU. Era+ changes will likely require some changes to the file so keep this link saved for updates.
 - Rag will eventually make his own BLU.lua that will likely be different. I recommend swapping to his once he releases it, but it sounds like it could be a while for that to come out.
