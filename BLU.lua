@@ -17,7 +17,6 @@ local drkSJMaxMP = nil
 
 local BluMagPhys = T{'Foot Kick', 'Sprout Smack', 'Wild Oats', 'Power Attack', 'Queasyshroom', 'Battle Dance', 'Feather Storm', 'Helldive', 'Bludgeon', 'Claw Cyclone', 'Screwdriver', 'Grand Slam', 'Smite of Rage', 'Pinecone Bomb', 'Jet Stream', 'Uppercut', 'Terror Touch', 'Mandibular Bite', 'Sickle Slash', 'Dimensional Death', 'Spiral Spin', 'Death Scissors', 'Seedspray', 'Body Slam', 'Hydro Shot', 'Frenetic Rip', 'Spinal Cleave', 'Hysteric Barrage', 'Asuran Claws', 'Cannonball', 'Disseverment', 'Ram Charge', 'Vertical Cleave', 'Final Sting', 'Goblin Rush', 'Vanity Dive', 'Whirl of Rage', 'Benthic Typhoon', 'Quad. Continuum', 'Empty Thrash', 'Delta Thrust', 'Heavy Strike', 'Quadrastrike', 'Tourbillion', 'Amorphic Spikes', 'Barbed Crescent', 'Bilgestorm', 'Bloodrake', 'Glutinous Dart', 'Paralyzing Triad', 'Thrashing Assault', 'Sinker Drill', 'Sweeping Gouge', 'Saurian Slide'}
 local BluMagDebuff = T{'Filamented Hold', 'Cimicine Discharge', 'Demoralizing Roar', 'Venom Shell', 'Light of Penance', 'Sandspray', 'Auroral Drape', 'Frightful Roar', 'Enervation', 'Infrasonics', 'Lowing', 'CMain Wave', 'Awful Eye', 'Voracious Trunk', 'Sheep Song', 'Soporific', 'Yawn', 'Dream Flower', 'Chaotic Eye', 'Sound Blast', 'Blank Gaze', 'Stinking Gas', 'Geist Wall', 'Feather Tickle', 'Reaving Wind', 'Mortal Ray', 'Absolute Terror', 'Blistering Roar', 'Cruel Joke'}
-local BluMagStun = T{'Head Butt', 'Frypan', 'Tail Slap', 'Sub-zero Smash', 'Sudden Lunge'}
 local BluMagBuff = T{'Zephyr Mantle', 'Cocoon', 'Refueling', 'Feather Barrier', 'Memento Mori', 'Warm-Up', 'Amplification', 'Triumphant Roar', 'Saline Coat', 'Reactor Cool', 'Plasma Charge', 'Regeneration', 'Animating Wail', 'Battery Charge', 'Winds of Promy.', 'Barrier Tusk', 'Orcish Counterstance', 'Pyric Bulwark', 'Nat. Meditation', 'Restoral', 'Erratic Flutter', 'Carcharian Verve', 'Harden Shell', 'Mighty Guard'}
 local BluMagSkill = T{'Metallic Body', 'Diamondhide', 'Magic Barrier', 'Occultation', 'Atra. Libations'}
 local BluMagCure = T{'Pollen', 'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Plenilune Embrace'}
@@ -28,6 +27,7 @@ local BluMagEnmity = T{'Actinic Burst', 'Exuviation', 'Fantod', 'Jettatura', 'Te
 -- GearSwap data files for consistency). Where a spell's secondary stat isn't STR/DEX/VIT/AGI/CHR
 -- (e.g. the INT-mod Mandibular Bite/Queasyshroom, or the MND-mod Ram Charge/Screwdriver/Tourbillion),
 -- it falls back to STR per user direction, since there's no dedicated INT/MND physical subset.
+local BluPhysStun = T{'Head Butt', 'Frypan', 'Tail Slap', 'Sub-zero Smash', 'Sudden Lunge'}
 local BluPhysSTR = T{'Battle Dance', 'Death Scissors', 'Dimensional Death', 'Empty Thrash', 'Quadrastrike', 'Sinker Drill', 'Spinal Cleave', 'Uppercut', 'Vertical Cleave', 'Saurian Slide', 'Bloodrake', 'Mandibular Bite', 'Queasyshroom', 'Ram Charge', 'Screwdriver', 'Tourbillion', 'Bilgestorm', 'Whirl of Rage', 'Sweeping Gouge', 'Final Sting'}
 local BluPhysDEX = T{'Amorphic Spikes', 'Asuran Claws', 'Barbed Crescent', 'Claw Cyclone', 'Disseverment', 'Foot Kick', 'Frenetic Rip', 'Goblin Rush', 'Hysteric Barrage', 'Paralyzing Triad', 'Seedspray', 'Sickle Slash', 'Smite of Rage', 'Terror Touch', 'Thrashing Assault', 'Vanity Dive', 'Heavy Strike'}
 local BluPhysVIT = T{'Body Slam', 'Cannonball', 'Delta Thrust', 'Glutinous Dart', 'Grand Slam', 'Power Attack', 'Quad. Continuum', 'Sprout Smack'}
@@ -635,7 +635,7 @@ profile.HandleMidcast = function()
         gFunc.EquipSet('BluBreath')
         gcmage.EquipObi(action)
         gcmage.EquipStaff()
-    elseif (BluMagPhys:contains(action.Name)) then
+    elseif (BluMagPhys:contains(action.Name) or BluPhysStun:contains(action.Name)) then
         -- Inlined from what used to be a custom gcmelee.EquipBluPhysical() addition, so BLU.lua no
         -- longer depends on any non-upstream change to gcmelee.lua.
         local physCa = gData.GetBuffCount('Chain Affinity')
@@ -654,6 +654,11 @@ profile.HandleMidcast = function()
         elseif (BluPhysAGI:contains(action.Name)) then gFunc.EquipSet('BluPhysical_AGI')
         elseif (BluPhysCHR:contains(action.Name)) then gFunc.EquipSet('BluPhysical_CHR')
         end
+
+        -- Stun-type spells (Head Butt, Frypan, etc.) are physical, not magical - they now get
+        -- BluPhysical as their base like every other physical Blue Magic spell, with BluStun layered
+        -- on top as the stun-specific overlay, instead of layering over BluMagical like before.
+        if (BluPhysStun:contains(action.Name)) then gFunc.EquipSet('BluStun') end
     elseif (action.Skill == 'Blue Magic') then
         if (BluMagBuff:contains(action.Name)) then
             gFunc.EquipSet('ConserveMP') -- non-skill-scaling buffs (Refueling, Plasma Charge, etc.)
@@ -663,8 +668,7 @@ profile.HandleMidcast = function()
             gFunc.EquipSet('BluMagicAccuracy')
         else
             gFunc.EquipSet('BluMagical')
-            if (BluMagStun:contains(action.Name)) then gFunc.EquipSet('BluStun')
-            elseif (BluMagCure:contains(action.Name)) then gFunc.EquipSet('Cure')
+            if (BluMagCure:contains(action.Name)) then gFunc.EquipSet('Cure')
             elseif (BluMagEnmity:contains(action.Name)) then gFunc.EquipSet('Enmity')
             elseif (action.Name == 'White Wind') then gFunc.EquipSet('WhiteWind')
             else
