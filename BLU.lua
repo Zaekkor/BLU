@@ -41,6 +41,7 @@ local BluPhysDEX = T{'Amorphic Spikes', 'Asuran Claws', 'Barbed Crescent', 'Claw
 local BluPhysVIT = T{'Body Slam', 'Cannonball', 'Delta Thrust', 'Glutinous Dart', 'Grand Slam', 'Power Attack', 'Quad. Continuum', 'Sprout Smack'}
 local BluPhysAGI = T{'Benthic Typhoon', 'Feather Storm', 'Helldive', 'Hydro Shot', 'Jet Stream', 'Pinecone Bomb', 'Spiral Spin', 'Wild Oats'}
 local BluPhysCHR = T{'Bludgeon'}
+local BluPhysMulti = T{'Bludgeon', 'Jet Stream', 'Quad. Continuum', 'Frenetic Rip', 'Hysteric Barrage', 'Disseverment'}
 
 -- Magical Blue Magic stat-mod sub-classification, same source. Everything not listed here defaults
 -- to INT (the standard magic damage stat) - only the spells with a documented MND or CHR mod get
@@ -777,6 +778,8 @@ profile.HandleMidcast = function()
         elseif (BluPhysAGI:contains(action.Name)) then gFunc.EquipSet('BluPhysical_AGI')
         elseif (BluPhysCHR:contains(action.Name)) then gFunc.EquipSet('BluPhysical_CHR')
         end
+        if (gcdisplay.GetCycle('TP') == 'HighAcc') and (BluePhysMulti:contains(action.Name)) then gFunc.EquipSet('TP_HighAcc')
+end
 
         -- Stun-type spells (Head Butt, Frypan, etc.) are physical, not magical - they now get
         -- BluPhysical as their base like every other physical Blue Magic spell, with BluStun layered
