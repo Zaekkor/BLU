@@ -8,10 +8,18 @@ local fastCastValue = 0.10
 -- left nil (disabled) by default. Fill in a value here if you want IdleMaxMP gear at a specific
 -- subjob MP threshold.
 local ninSJMaxMP = 748
-local whmSJMaxMP = nil
+local whmSJMaxMP = 816
 local blmSJMaxMP = nil
 local rdmSJMaxMP = nil
 local drkSJMaxMP = nil
+
+-- Self-contained "Extra mode" equivalent to the /extra command other mage jobs get via companion
+-- "_advanced" files (rdm_advanced.lua/whm_advanced.lua) we don't have access to. While the /extra
+-- toggle is on and current (or post-cast) MP is still at or above this threshold, BLU stays in
+-- IdleMaxMP-conservation gear - while idle and not engaged, and layered onto magical casts - rather
+-- than falling back to normal gear, letting you squeeze a few more casts out before MP gets tight.
+-- Tune this to whatever MP value makes sense for your own IdleMaxMP set/playstyle.
+local extraThreshold = 817
 
 -- Blue Magic classification tables. These decide which gear set HandleMidcast reaches for based on the spell being cast.
 
@@ -56,6 +64,12 @@ local Settings = {
 -- GetAutoWeaponLoadout uses the SubJob-based auto-selection or the manually-toggled cycle value.
 local weaponLoadoutManualOverride = false
 
+-- Sticky flag for the MaxMP Resting logic below: once MP tops off while resting, stays true until you
+-- stop resting, so a small MP dip right at the threshold (e.g. a party member's spell) doesn't cause
+-- gear to flicker back and forth between Resting and IdleMaxMP.
+local restingMaxMP = false
+
+
 local sets = {
     Idle_Priority = {
         Ammo = {'Tiphia Sting'},
@@ -73,7 +87,21 @@ local sets = {
         Feet = {'Crimson Greaves'},
     },
     IdleALT_Priority = {},
-    IdleMaxMP_Priority = {},
+    IdleMaxMP_Priority = {
+        Ammo = {'Hedgehog Bomb'},
+        Head = {'Walahra Turban'},
+        Neck = {'Beak Necklace'},
+        Ear1 = {'Antivenom Earring'},
+        Ear2 = {'Phtm. Earring +1'},
+        Body = {'Crm. Scale Mail'},
+        Hands = {'Morrigan\'s Cuffs'},
+        Ring1 = {'Astral Ring'},
+        Ring2 = {'Astral Ring'},
+        Back = {'Errant Cape'},
+        Waist = {'Hierarch Belt'},
+        Legs = {'Homam Cosciales'},
+        Feet = {'Homam Gambieras'},
+    },
     Resting_Priority = {
         Main = {'Pluto\'s Staff'},
         Sub = 'displaced',
@@ -127,8 +155,36 @@ local sets = {
 
     -- Enhancing Magic / Stoneskin (Utsusemi, Stoneskin, Phalanx, etc. from a subjob spell)
     Enhancing_Priority = {},
-    Stoneskin_Priority = {},
-    StoneskinExtra_Priority = {},
+    Stoneskin_Priority = {
+        Ammo = {'Hedgehog Bomb'},
+        Head = {'Yigit Turban'},
+        Neck = {'Justice Badge'},
+        Ear1 = {'Loquac. Earring'},
+        Ear2 = {'Cmn. Earring'},
+        Body = {'Errant Hpl.'},
+        Hands = {'Yigit Gages'},
+        Ring1 = {'Aqua Ring'},
+        Ring2 = {'Tamas Ring'},
+        Back = {'Prism Cape'},
+        Waist = {'Penitent\'s Rope'},
+        Legs = {'Morrigan\'s Slops'},
+        Feet = {'Morrigan\'s Pgch.'},
+    },
+    StoneskinExtra_Priority = {
+        Ammo = {'Hedgehog Bomb'},
+        Head = {'Yigit Turban'},
+        Neck = {'Justice Badge'},
+        Ear1 = {'Loquac. Earring'},
+        Ear2 = {'Antivenom Earring'},
+        Body = {'Crm. Scale Mail'},
+        Hands = {'Yigit Gages'},
+        Ring1 = {'Astral Ring'},
+        Ring2 = {'Tamas Ring'},
+        Back = {'Prism Cape'},
+        Waist = {'Penitent\'s Rope'},
+        Legs = {'Morrigan\'s Slops'},
+        Feet = {'Morrigan\'s Pgch.'},
+    },
     PhalanxExtra_Priority = {},
 
     -- Dark Magic / Ninjutsu Stun
@@ -293,6 +349,29 @@ TP_Ear2_Priority = {
         Ring1 = {'Heavens Ring'},
         Ring2 = {'Heavens Ring'},
     },
+
+    -- Layered on top of the base BluMagical_INT/MND/CHR set (instead of it) when /extra mode is on
+    -- and you'll still have plenty of MP left after the cast (see extraThreshold) - the BLU-specific
+    -- equivalent of what gcmage.lua's NukeExtra/StoneskinExtra/PhalanxExtra would do for other mage
+    -- jobs, but self-contained since that mechanism can't reach BLU.
+    BluMagical_INT_Extra_Priority = {
+        Ammo = {'Phtm. Tathlum'},
+        Head = {'Morrigan\'s Coron.'},
+        Neck = {'Philomath Stole'},
+        Ear1 = {'Moldavite Earring'},
+        Ear2 = {'Phtm. Earring +1'},
+        Body = {'Crm. Scale Mail'},
+        Hands = {'Morrigan\'s Cuffs'},
+        Ring1 = {'Astral Ring'},
+        Ring2 = {'Tamas Ring'},
+        Back = {'Prism Cape'},
+        Waist = {'Hierarch Belt'},
+        Legs = {'Morrigan\'s Slops'},
+        Feet = {'Morrigan\'s Pgch.'},
+    },
+    BluMagical_MND_Extra_Priority = {},
+    BluMagical_CHR_Extra_Priority = {},
+
     BluMagicAccuracy_Priority = {
         Ammo = {'Phtm. Tathlum'},
         Head = {'Morrigan\'s Coron.'},
@@ -410,7 +489,6 @@ sets.EnfeeblingMND = sets.BluMagical_MND_Priority
 sets.Nuke = sets.BluMagical_INT_Priority
 sets.NukeACC = sets.BluMagicAccuracy_Priority
 sets.NukeDOT = sets.BluMagical_INT_Priority
-sets.NukeExtra = sets.BluMagical_INT_Priority
 sets.NukeHNM = sets.BluMagical_INT_Priority
 sets.MB = sets.BluMagical_INT_Priority
 sets.MBHNM = sets.BluMagical_INT_Priority
@@ -496,11 +574,19 @@ end
 profile.OnLoad = function()
     gcmage.Load(gcmage.GetVer())
 
+    gcdisplay.CreateToggle('BLUExtra', false)
+
+    -- weapon/wl are already aliased automatically by gcmage.Load() above (part of its own AliasList),
+    -- but weaponauto/extra are entirely our own custom commands and need their own explicit alias
+    -- registration, or Ashita has no idea to route /weaponauto and /extra to HandleCommand at all.
+    gcinclude.SetAlias(T{'weaponauto', 'extra'})
+
     profile.SetMacroBook()
 end
 
 profile.OnUnload = function()
     gcmage.Unload()
+    gcinclude.ClearAlias(T{'weaponauto', 'extra'})
 end
 
 profile.HandleCommand = function(args)
@@ -509,6 +595,10 @@ profile.HandleCommand = function(args)
     elseif (args[1] == 'weaponauto') then
         weaponLoadoutManualOverride = false
         gcinclude.Message('Weapon Loadout', 'Auto (' .. GetAutoWeaponLoadout() .. ')')
+        return
+    elseif (args[1] == 'extra') then
+        gcdisplay.AdvanceToggle('BLUExtra')
+        gcinclude.Message('BLUExtra', gcdisplay.GetToggle('BLUExtra'))
         return
     end
 
@@ -570,7 +660,40 @@ profile.HandleDefault = function()
 
     gcmage.DoDefault(sets, ninSJMaxMP, whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
 
-    gcmage.DoDefaultOverride()
+    -- Calls gcinclude.DoDefaultOverride directly rather than going through gcmage.DoDefaultOverride's
+    -- wrapper. That wrapper adds a "MaxMP Resting" feature (WHM/BLM/RDM/SMN-oriented) that, once MP
+    -- hits 95%, bypasses the correct 16-second-timer Resting gear entirely and re-equips Idle gear +
+    -- dark_staff (Pluto's Staff) every tick instead - which is exactly why Pluto's Staff was jumping in
+    -- immediately on Resting and the real Resting set never stuck. gcinclude.DoDefaultOverride(false)
+    -- is the actual underlying function with the correct timer-gated Resting logic, with none of that.
+    -- The wrapper's other addition, gcmage.EquipWeaponLoadout(), is redundant for us anyway since we
+    -- apply our own auto-selected Weapon Loadout unconditionally below.
+    gcinclude.DoDefaultOverride(false)
+
+    -- Corrected, self-contained version of gcmage.lua's "MaxMP Resting" feature: once MP tops off
+    -- while resting, there's no more benefit to Resting-tick gear, so switch to an MP-conservation
+    -- idle set instead. Applied AFTER the correct timer-gated Resting call above, so it only ever WINS
+    -- (overrides) rather than racing/blocking it like the original bug - Resting gear still gets its
+    -- correct chance to show for the full window between the 16s timer expiring and MP actually
+    -- reaching 95%. Fill in real gear for IdleMaxMP_Priority if you want this to do anything.
+    if (player.Status == 'Resting') then
+        if (player.MPP >= 95 or restingMaxMP) then
+            restingMaxMP = true
+            gFunc.EquipSet('IdleMaxMP')
+            if (conquest:GetOutsideControl()) then
+                gFunc.EquipSet('republic_gold_medal')
+            end
+        end
+    else
+        restingMaxMP = false
+    end
+
+    -- Self-contained "Extra mode": while idle (not resting, not engaged - those have their own gear
+    -- priorities already) with /extra toggled on and current MP still at or above extraThreshold, stay
+    -- in IdleMaxMP-conservation gear instead of normal Idle gear.
+    if (player.Status ~= 'Resting' and player.Status ~= 'Engaged' and gcdisplay.GetToggle('BLUExtra') and player.MP >= extraThreshold) then
+        gFunc.EquipSet('IdleMaxMP')
+    end
 
     -- Always equip a TP set while engaged, regardless of the shared /tp toggle's Off/LowAcc/HighAcc
     -- state (gcmage.DoDefault's built-in TP dispatch only fires when that toggle isn't 'Off', which
@@ -690,6 +813,18 @@ profile.HandleMidcast = function()
                 if (action.MppAftercast < 51) then
                     gFunc.EquipSet('uggalepih_pendant')
                 end
+
+                -- Self-contained "Extra mode": if /extra is on and you'll still have plenty of MP left
+                -- after this cast, layer the stat-appropriate _Extra variant on top instead of the
+                -- regular BluMagical_INT/MND/CHR set just applied above - the BLU-specific equivalent
+                -- of NukeExtra/etc, checked against post-cast MP since the point is "can I afford
+                -- another one right after this."
+                if (gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
+                    if (BluMagMND:contains(action.Name)) then gFunc.EquipSet('BluMagical_MND_Extra')
+                    elseif (BluMagCHR:contains(action.Name)) then gFunc.EquipSet('BluMagical_CHR_Extra')
+                    else gFunc.EquipSet('BluMagical_INT_Extra') -- covers BluMagINT and the unclassified default
+                    end
+                end
             end
 
             local ca = gData.GetBuffCount('Chain Affinity')
@@ -715,6 +850,18 @@ profile.HandleMidcast = function()
         -- every possible subjob spell here. Requires SIRD/SIRD_NIN to exist in the sets table above
         -- (direct field access, not the bare-name alias mechanism) or this crashes for NIN subs.
         gcmage.DoMidcast(sets, ninSJMaxMP, whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
+
+        -- Self-contained Extra mode extension for Stoneskin/Phalanx (Enhancing Magic spells reachable
+        -- via a subjob through the DoMidcast fallback above). gcmage.lua's own StoneskinExtra/
+        -- PhalanxExtra dispatch inside EquipEnhancing is hard-gated to MainJob == 'BLM', so it can
+        -- never fire for BLU - same story as NukeExtra, handled here instead.
+        if (gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
+            if (action.Name == 'Stoneskin') then
+                gFunc.EquipSet('StoneskinExtra')
+            elseif (action.Name == 'Phalanx') then
+                gFunc.EquipSet('PhalanxExtra')
+            end
+        end
     end
 
     LockTPWeapon()
