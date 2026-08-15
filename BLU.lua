@@ -778,7 +778,7 @@ profile.HandleMidcast = function()
         elseif (BluPhysAGI:contains(action.Name)) then gFunc.EquipSet('BluPhysical_AGI')
         elseif (BluPhysCHR:contains(action.Name)) then gFunc.EquipSet('BluPhysical_CHR')
         end
-        if (gcdisplay.GetCycle('TP') == 'HighAcc') and (BluePhysMulti:contains(action.Name)) then gFunc.EquipSet('TP_HighAcc')
+        if (gcdisplay.GetCycle('TP') == 'HighAcc') and (BluPhysMulti:contains(action.Name)) then gFunc.EquipSet('TP_HighAcc')
 end
 
         -- Stun-type spells (Head Butt, Frypan, etc.) are physical, not magical - they now get
