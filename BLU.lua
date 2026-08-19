@@ -7,8 +7,8 @@ local fastCastValue = 0.10
 -- NIN, which has no MP-conservation idle gear convention like WHM/BLM/RDM/DRK subs do, so these are
 -- left nil (disabled) by default. Fill in a value here if you want IdleMaxMP gear at a specific
 -- subjob MP threshold.
-local ninSJMaxMP = 748
-local whmSJMaxMP = 816
+local ninSJMaxMP = nil
+local whmSJMaxMP = nil
 local blmSJMaxMP = nil
 local rdmSJMaxMP = nil
 local drkSJMaxMP = nil
@@ -19,7 +19,7 @@ local drkSJMaxMP = nil
 -- IdleMaxMP-conservation gear - while idle and not engaged, and layered onto magical casts - rather
 -- than falling back to normal gear, letting you squeeze a few more casts out before MP gets tight.
 -- Tune this to whatever MP value makes sense for your own IdleMaxMP set/playstyle.
-local extraThreshold = 817
+local extraThreshold = nil
 
 -- Blue Magic classification tables. These decide which gear set HandleMidcast reaches for based on the spell being cast.
 
@@ -239,6 +239,13 @@ TP_Ear2_Priority = {
     Ear2 = {'Suppanomimi'},
     },
     TP_Mjollnir_Haste_Priority = {},
+
+    -- Tanking-focused alternatives to TP_LowAcc/TP_HighAcc, cycled through the same /tp command
+    -- (Off -> LowAcc -> HighAcc -> Tank_LowAcc -> Tank_HighAcc -> back to Off). Tank_LowAcc acts as
+    -- its own base (replacing TP_LowAcc_Priority when selected), and Tank_HighAcc layers on top of it
+    -- the same way TP_HighAcc layers on top of TP_LowAcc.
+    TP_Tank_LowAcc_Priority = {},
+    TP_Tank_HighAcc_Priority = {},
 
     -- Weapon Loadouts are meant to set custom weapon sets for engaging and fighting mobs.
     -- Weapon_Loadout_1 will auto-equip when SubJob is set to /NIN, and you are engaged.
@@ -542,14 +549,22 @@ local function LockTPWeapon()
     -- regardless of the toggle (see the Engaged block in HandleDefault), but the lock itself only
     -- applies when the toggle isn't 'Off', so /tp off lets you freely swap Main/Sub/Range/Ammo (e.g.
     -- for a spell that needs a staff) even while TP is banked.
-    if (player.TP <= 0 or gcdisplay.GetCycle('TP') == 'Off') then return end
+    local tpCycle = gcdisplay.GetCycle('TP')
+    if (player.TP <= 0 or tpCycle == 'Off') then return end
 
-    local lockSet = gFunc.Combine({}, sets.TP_LowAcc_Priority)
+    local lockSet
+    if (tpCycle == 'Tank_LowAcc' or tpCycle == 'Tank_HighAcc') then
+        lockSet = gFunc.Combine({}, sets.TP_Tank_LowAcc_Priority)
+    else
+        lockSet = gFunc.Combine({}, sets.TP_LowAcc_Priority)
+    end
     if (player.SubJob == 'NIN') then
         lockSet = gFunc.Combine(lockSet, sets.TP_NIN_Priority)
     end
-    if (gcdisplay.GetCycle('TP') == 'HighAcc') then
+    if (tpCycle == 'HighAcc') then
         lockSet = gFunc.Combine(lockSet, sets.TP_HighAcc_Priority)
+    elseif (tpCycle == 'Tank_HighAcc') then
+        lockSet = gFunc.Combine(lockSet, sets.TP_Tank_HighAcc_Priority)
     end
 
     -- Main/Sub now live in the active Weapon Loadout set rather than the TP sets themselves, so layer
@@ -575,19 +590,27 @@ end
 profile.OnLoad = function()
     gcmage.Load(gcmage.GetVer())
 
+    -- Extends the shared /tp cycle (created by gcmage.Load above as Off/LowAcc/HighAcc) with two more
+    -- states for tanking-focused TP gear. CreateCycle unconditionally overwrites whatever's already
+    -- registered under this name, so calling it again here after gcmage.Load just replaces the 3-state
+    -- array with our 5-state one - no gcmage.lua changes needed, and /tp (already aliased by gcmage's
+    -- own AliasList) cycles through all 5 automatically.
+    gcdisplay.CreateCycle('TP', {'Off', 'LowAcc', 'HighAcc', 'Tank_LowAcc', 'Tank_HighAcc'})
+
     gcdisplay.CreateToggle('BLUExtra', false)
+    gcdisplay.CreateToggle('AFHands', false)
 
     -- weapon/wl are already aliased automatically by gcmage.Load() above (part of its own AliasList),
-    -- but weaponauto/extra are entirely our own custom commands and need their own explicit alias
-    -- registration, or Ashita has no idea to route /weaponauto and /extra to HandleCommand at all.
-    gcinclude.SetAlias(T{'weaponauto', 'extra'})
+    -- but weaponauto/extra/afhands are entirely our own custom commands and need their own explicit
+    -- alias registration, or Ashita has no idea to route them to HandleCommand at all.
+    gcinclude.SetAlias(T{'weaponauto', 'extra', 'afhands'})
 
     profile.SetMacroBook()
 end
 
 profile.OnUnload = function()
     gcmage.Unload()
-    gcinclude.ClearAlias(T{'weaponauto', 'extra'})
+    gcinclude.ClearAlias(T{'weaponauto', 'extra', 'afhands'})
 end
 
 profile.HandleCommand = function(args)
@@ -600,6 +623,10 @@ profile.HandleCommand = function(args)
     elseif (args[1] == 'extra') then
         gcdisplay.AdvanceToggle('BLUExtra')
         gcinclude.Message('BLUExtra', gcdisplay.GetToggle('BLUExtra'))
+        return
+    elseif (args[1] == 'afhands') then
+        gcdisplay.AdvanceToggle('AFHands')
+        gcinclude.Message('AF Hands', gcdisplay.GetToggle('AFHands'))
         return
     end
 
@@ -702,7 +729,13 @@ profile.HandleDefault = function()
     -- if applicable; the /tp toggle's HighAcc layers on top of that again, so HighAcc always wins any
     -- slot it shares with TP_NIN, regardless of subjob.
     if (player.Status == 'Engaged') then
-        gFunc.EquipSet('TP_LowAcc')
+        local tpCycle = gcdisplay.GetCycle('TP')
+
+        if (tpCycle == 'Tank_LowAcc' or tpCycle == 'Tank_HighAcc') then
+            gFunc.EquipSet('TP_Tank_LowAcc')
+        else
+            gFunc.EquipSet('TP_LowAcc')
+        end
 
         if (zone.WeatherElement ~= 'Dark') then gFunc.EquipSet('TP_Ear2') end
         if (zone.Time >= 6 and zone.Time < 18 and player.SubJob ~= 'NIN') then gFunc.EquipSet('tp_fenrirs_earring') end
@@ -711,8 +744,10 @@ profile.HandleDefault = function()
         if (player.SubJob == 'NIN') then
             gFunc.EquipSet('TP_NIN')
         end
-        if (gcdisplay.GetCycle('TP') == 'HighAcc') then
+        if (tpCycle == 'HighAcc') then
             gFunc.EquipSet('TP_HighAcc')
+        elseif (tpCycle == 'Tank_HighAcc') then
+            gFunc.EquipSet('TP_Tank_HighAcc')
         end
 
         -- gcmage.EquipWeaponLoadout() only fires when the /tp toggle isn't 'Off', which doesn't fit
@@ -725,6 +760,13 @@ profile.HandleDefault = function()
     -- lazy equip weapons for salvage runs
     if (zone.Area ~= nil and zone.Area:contains('Remnants')) then
         gFunc.EquipSet('Salvage')
+    end
+
+    -- /afhands forces Magus Bazubands into the Hands slot while idle or engaged, overriding whatever
+    -- else would normally go there. Excluded while Resting - Resting_Priority's own Hands choice
+    -- should always win there regardless of this toggle.
+    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
+        gFunc.ForceEquipSet({Hands = 'Magus Bazubands'})
     end
 
     LockTPWeapon()
@@ -844,8 +886,12 @@ end
         -- DayElement against action.Element and only equips an obi if you own one and it's active;
         -- EquipStaff checks environment.DayElement/WeatherElement and lastSummoningElement internally
         -- via the shared ElementalStaffTable. Both silently no-op for non-elemental Blue Magic spells.
-        gcmage.EquipObi(action)
-        gcmage.EquipStaff()
+        -- Skipped entirely for BluMagBuff/BluMagSkill spells - elemental staves don't affect these
+        -- (non-skill-scaling buffs and skill-scaling buffs/defenses), so swapping one in was pointless.
+        if not (BluMagBuff:contains(action.Name) or BluMagSkill:contains(action.Name)) then
+            gcmage.EquipObi(action)
+            gcmage.EquipStaff()
+        end
     else
         -- Anything that isn't a Blue Magic spell (e.g. actual White Magic Cure from a WHM subjob,
         -- Utsusemi/Stoneskin from NIN, Dia/Bio from RDM, etc.) gets handled by the same shared
