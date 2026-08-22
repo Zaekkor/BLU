@@ -148,6 +148,11 @@ local sets = {
     SIRD = {},
     SIRD_NIN = {},
 
+    -- Forced into the Hands slot by /afhands (see HandleDefault) while idle or engaged.
+    AFHands_Priority = {
+        Hands = {'Magus Bazubands'},
+    },
+
     -- Everything below is stubbed empty so nothing gcmage.DoMidcast/DoDefault/DoDefaultOverride/
     -- EquipWeaponLoadout/DoAbility might reference for non-Blue-Magic spells (now reachable via the
     -- gcmage.DoMidcast fallback in HandleMidcast) or job abilities can ever resolve to nil and crash,
@@ -421,11 +426,9 @@ TP_Ear2_Priority = {
     Enmity_Priority = {},
 
     Ws_Default_Priority = {},
-    Ws_Hybrid_Priority = {},
     Ws_HighAcc_Priority = {},
 
     Vorpal_Default_Priority = {},
-    Vorpal_Hybrid_Priority = {},
     Vorpal_HighAcc_Priority = {},
 
     Savage_Default_Priority = {
@@ -442,7 +445,6 @@ TP_Ear2_Priority = {
         Legs = 'Morrigan\'s Slops',
         Feet = 'Denali Gamashes',
     },
-    Savage_Hybrid_Priority = {},
     Savage_HighAcc_Priority = {},
 
     Expiacion_Default_Priority = {
@@ -459,8 +461,10 @@ TP_Ear2_Priority = {
         Legs = 'Morrigan\'s Slops',
         Feet = 'Denali Gamashes',
     },
-    Expiacion_Hybrid_Priority = {},
     Expiacion_HighAcc_Priority = {},
+
+    RedLotusBlade_Default_Priority = {},
+    SeraphBlade_Default_Priority = {},
 
     Ca_Priority = {},
     Ba_Priority = {},
@@ -669,10 +673,21 @@ profile.HandleWeaponskill = function()
         gFunc.EquipSet('Savage_Default')
     elseif (ws.Name == 'Expiacion') then
         gFunc.EquipSet('Expiacion_Default')
+    elseif (ws.Name == 'Red Lotus Blade') then
+        gFunc.EquipSet('RedLotusBlade_Default')
+    elseif (ws.Name == 'Seraph Blade') then
+        gFunc.EquipSet('SeraphBlade_Default')
     end
 
     if (gcdisplay.GetCycle('TP') == 'HighAcc') then
         gFunc.EquipSet('Ws_HighAcc')
+        if (ws.Name == 'Vorpal Blade') then
+            gFunc.EquipSet('Vorpal_HighAcc')
+        elseif (ws.Name == 'Savage Blade') then
+            gFunc.EquipSet('Savage_HighAcc')
+        elseif (ws.Name == 'Expiacion') then
+            gFunc.EquipSet('Expiacion_HighAcc')
+        end
     end
 end
 
@@ -766,7 +781,7 @@ profile.HandleDefault = function()
     -- else would normally go there. Excluded while Resting - Resting_Priority's own Hands choice
     -- should always win there regardless of this toggle.
     if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
-        gFunc.ForceEquipSet({Hands = 'Magus Bazubands'})
+        gFunc.EquipSet('AFHands')
     end
 
     LockTPWeapon()
@@ -776,6 +791,7 @@ end
 
 profile.HandlePrecast = function()
     local action = gData.GetAction()
+    local player = gData.GetPlayer()
 
     gFunc.EquipSet('Precast')
     if (string.contains(action.Skill, 'Blue Magic')) then
@@ -788,6 +804,13 @@ profile.HandlePrecast = function()
     if (castDelay >= 0.25) then
         gFunc.SetMidDelay(castDelay)
         gcinclude.DoCancel(action, castDelay - 0.4)
+    end
+
+    -- /afhands also needs to win here and in HandleMidcast, not just HandleDefault - casting a spell
+    -- while idle or engaged applies its own precast/midcast gear (which can include its own Hands
+    -- item) independently of HandleDefault, so without this the toggle would only hold between casts.
+    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
+        gFunc.EquipSet('AFHands')
     end
 
     LockTPWeapon()
@@ -911,6 +934,13 @@ end
                 gFunc.EquipSet('PhalanxExtra')
             end
         end
+    end
+
+    -- /afhands needs to win here too, same reasoning as HandlePrecast - midcast gear applies
+    -- independently of HandleDefault and can include its own Hands item.
+    local player = gData.GetPlayer()
+    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
+        gFunc.EquipSet('AFHands')
     end
 
     LockTPWeapon()
