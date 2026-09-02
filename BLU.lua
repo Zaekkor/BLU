@@ -784,6 +784,26 @@ profile.HandleDefault = function()
         gFunc.EquipSet('AFHands')
     end
 
+            -- Movement gear gets correctly applied earlier via gcinclude.DoDefaultOverride, but later dispatch
+    -- in this same function (TP gear while Engaged, IdleMaxMP while /extra is active) can touch the
+    -- same slots and silently overwrite it before it's ever visible. Re-applying it here, after
+    -- everything else, gives it the final say whenever you're actually moving.
+    if (player.IsMoving == true) then
+        if (gcdisplay.IdleSet == 'Normal'
+            or gcdisplay.IdleSet == 'Alternate'
+            or gcdisplay.IdleSet == 'DT'
+            or gcdisplay.IdleSet == 'Evasion'
+            or gcdisplay.IdleSet == 'Override'
+        ) then
+            gFunc.EquipSet('Movement')
+        end
+
+        if (player.Status == 'Engaged') then
+            gFunc.EquipSet('Movement')
+            gFunc.EquipSet('Movement_TP')
+        end
+    end
+
     LockTPWeapon()
 
     gFunc.EquipSet(gcinclude.BuildLockableSet(gData.GetEquipment()))
