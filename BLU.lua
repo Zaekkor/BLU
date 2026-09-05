@@ -30,23 +30,28 @@ local BluMagSkill = T{'Metallic Body', 'Diamondhide', 'Magic Barrier', 'Occultat
 local BluMagCure = T{'Pollen', 'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Plenilune Embrace'}
 local BluMagEnmity = T{'Actinic Burst', 'Exuviation', 'Fantod', 'Jettatura', 'Temporal Shift'}
 
+-- Physical Blue Magic spells that stun. These dispatch through the physical branch like any other
+-- physical spell, with the BluStun set layered on top as a stun-specific overlay.
+local BluPhysStun = T{'Head Butt', 'Frypan', 'Tail Slap', 'Sub-zero Smash', 'Sudden Lunge'}
+
 -- Physical Blue Magic stat-mod sub-classification, sourced from the bg-wiki "Calculating Blue Magic
 -- Damage" Stat Mod column (cross-referenced against multiple independent, community-maintained
 -- GearSwap data files for consistency). Where a spell's secondary stat isn't STR/DEX/VIT/AGI/CHR
 -- (e.g. the INT-mod Mandibular Bite/Queasyshroom, or the MND-mod Ram Charge/Screwdriver/Tourbillion),
--- it falls back to STR per user direction, since there's no dedicated INT/MND physical subset.
-local BluPhysStun = T{'Head Butt', 'Frypan', 'Tail Slap', 'Sub-zero Smash', 'Sudden Lunge'}
+-- it falls back to STR, since there's no dedicated INT/MND physical subset.
 local BluPhysSTR = T{'Battle Dance', 'Death Scissors', 'Dimensional Death', 'Empty Thrash', 'Quadrastrike', 'Sinker Drill', 'Spinal Cleave', 'Uppercut', 'Vertical Cleave', 'Saurian Slide', 'Bloodrake', 'Mandibular Bite', 'Queasyshroom', 'Ram Charge', 'Screwdriver', 'Tourbillion', 'Bilgestorm', 'Whirl of Rage', 'Sweeping Gouge', 'Final Sting'}
 local BluPhysDEX = T{'Amorphic Spikes', 'Asuran Claws', 'Barbed Crescent', 'Claw Cyclone', 'Disseverment', 'Foot Kick', 'Frenetic Rip', 'Goblin Rush', 'Hysteric Barrage', 'Paralyzing Triad', 'Seedspray', 'Sickle Slash', 'Smite of Rage', 'Terror Touch', 'Thrashing Assault', 'Vanity Dive', 'Heavy Strike'}
 local BluPhysVIT = T{'Body Slam', 'Cannonball', 'Delta Thrust', 'Glutinous Dart', 'Grand Slam', 'Power Attack', 'Quad. Continuum', 'Sprout Smack'}
 local BluPhysAGI = T{'Benthic Typhoon', 'Feather Storm', 'Helldive', 'Hydro Shot', 'Jet Stream', 'Pinecone Bomb', 'Spiral Spin', 'Wild Oats'}
 local BluPhysCHR = T{'Bludgeon'}
+-- Multi-hit physical Blue Magic. These benefit disproportionately from accuracy (every hit can miss
+-- independently), so they additionally pull the TP_HighAcc set when the /tp cycle is on HighAcc.
 local BluPhysMulti = T{'Bludgeon', 'Jet Stream', 'Quad. Continuum', 'Frenetic Rip', 'Hysteric Barrage', 'Disseverment'}
 
--- Magical Blue Magic stat-mod sub-classification, same source. Everything not listed here defaults
--- to INT (the standard magic damage stat) - only the spells with a documented MND or CHR mod get
--- their own list. Only applies to the generic magic-damage fallback in HandleMidcast (Cure/Enmity/
--- Stun/White Wind/Dark spells already have their own dedicated, more specific sets).
+-- Magical Blue Magic stat-mod sub-classification, same source. Only applies to the generic
+-- magic-damage fallback in HandleMidcast - Cure, Enmity and White Wind spells are matched earlier and
+-- use their own dedicated sets. Anything not listed in any of the three tables below falls through to
+-- the base BluMagical set.
 local BluMagMND = T{'Acrid Stream', 'Magic Hammer', 'Mind Blast'}
 local BluMagCHR = T{'Eyes On Me', 'Mysterious Light'}
 local BluMagINT = T{'Sandspin', 'Cursed Sphere', 'Bomb Toss', 'Death Ray', 'Blitzstrahl', 'Ice Break', 'Maelstrom', 'Corrosive Ooze', 'Firespit', 'Regurgitation'}
@@ -147,6 +152,13 @@ local sets = {
     -- Fill in real SIRD gear if you want it; empty is a safe no-op.
     SIRD = {},
     SIRD_NIN = {},
+
+    -- Direct table field access in gcmage.lua's SetupMidcastDelay, gated only by the 'Hate' toggle plus
+    -- casting Cure III/Cure IV by name - not actually MainJob-restricted in the code despite living
+    -- alongside WHM-specific logic, so reachable via a WHM subjob too (confirmed - PLD needed these too).
+    Cheat_C3HPDown = {},
+    Cheat_C4HPDown = {},
+    Cheat_HPUp = {},
 
     -- Forced into the Hands slot by /afhands (see HandleDefault) while idle or engaged.
     AFHands_Priority = {
@@ -546,6 +558,17 @@ local function GetAutoWeaponLoadout()
     return '2'
 end
 
+-- /afhands forces Magus Bazubands into the Hands slot, overriding whatever else would normally go
+-- there. Called at the end of HandleDefault, HandlePrecast and HandleMidcast: each applies its own
+-- gear independently (which can include its own Hands item), so the override has to be re-asserted in
+-- all three or it would only hold between casts. Excluded while Resting - Resting_Priority's own Hands
+-- choice always wins there regardless of the toggle.
+local function ApplyAFHands()
+    if (gcdisplay.GetToggle('AFHands') and gData.GetPlayer().Status ~= 'Resting') then
+        gFunc.EquipSet('AFHands')
+    end
+end
+
 local function LockTPWeapon()
     local player = gData.GetPlayer()
     -- Mimics the WHM/RDM pattern of gating the weapon/range/ammo lock behind the /tp toggle - unlike
@@ -661,32 +684,32 @@ profile.HandleMidshot = function()
     gFunc.EquipSet('Midshot')
 end
 
+-- Maps weaponskill name to its gear set prefix. Weaponskills not listed here just use the generic
+-- Ws_Default / Ws_HighAcc sets. Red Lotus Blade and Seraph Blade intentionally have no HighAcc
+-- variant - they don't need accuracy sets, so only their _Default set exists.
+local WeaponskillSets = {
+    ['Vorpal Blade']    = {prefix = 'Vorpal',         highAcc = true},
+    ['Savage Blade']    = {prefix = 'Savage',         highAcc = true},
+    ['Expiacion']       = {prefix = 'Expiacion',      highAcc = true},
+    ['Red Lotus Blade'] = {prefix = 'RedLotusBlade',  highAcc = false},
+    ['Seraph Blade']    = {prefix = 'SeraphBlade',    highAcc = false},
+}
+
 profile.HandleWeaponskill = function()
     local ws = gData.GetAction()
+    local wsSet = WeaponskillSets[ws.Name]
 
     gFunc.EquipSet('Ws_Default')
     gcmelee.DoFenrirsEarring()
 
-    if (ws.Name == 'Vorpal Blade') then
-        gFunc.EquipSet('Vorpal_Default')
-    elseif (ws.Name == 'Savage Blade') then
-        gFunc.EquipSet('Savage_Default')
-    elseif (ws.Name == 'Expiacion') then
-        gFunc.EquipSet('Expiacion_Default')
-    elseif (ws.Name == 'Red Lotus Blade') then
-        gFunc.EquipSet('RedLotusBlade_Default')
-    elseif (ws.Name == 'Seraph Blade') then
-        gFunc.EquipSet('SeraphBlade_Default')
+    if (wsSet ~= nil) then
+        gFunc.EquipSet(wsSet.prefix .. '_Default')
     end
 
     if (gcdisplay.GetCycle('TP') == 'HighAcc') then
         gFunc.EquipSet('Ws_HighAcc')
-        if (ws.Name == 'Vorpal Blade') then
-            gFunc.EquipSet('Vorpal_HighAcc')
-        elseif (ws.Name == 'Savage Blade') then
-            gFunc.EquipSet('Savage_HighAcc')
-        elseif (ws.Name == 'Expiacion') then
-            gFunc.EquipSet('Expiacion_HighAcc')
+        if (wsSet ~= nil and wsSet.highAcc) then
+            gFunc.EquipSet(wsSet.prefix .. '_HighAcc')
         end
     end
 end
@@ -703,22 +726,18 @@ profile.HandleDefault = function()
 
     gcmage.DoDefault(sets, ninSJMaxMP, whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
 
-    -- Calls gcinclude.DoDefaultOverride directly rather than going through gcmage.DoDefaultOverride's
-    -- wrapper. That wrapper adds a "MaxMP Resting" feature (WHM/BLM/RDM/SMN-oriented) that, once MP
-    -- hits 95%, bypasses the correct 16-second-timer Resting gear entirely and re-equips Idle gear +
-    -- dark_staff (Pluto's Staff) every tick instead - which is exactly why Pluto's Staff was jumping in
-    -- immediately on Resting and the real Resting set never stuck. gcinclude.DoDefaultOverride(false)
-    -- is the actual underlying function with the correct timer-gated Resting logic, with none of that.
-    -- The wrapper's other addition, gcmage.EquipWeaponLoadout(), is redundant for us anyway since we
-    -- apply our own auto-selected Weapon Loadout unconditionally below.
+    -- Deliberately calls gcinclude.DoDefaultOverride directly rather than gcmage.DoDefaultOverride.
+    -- The gcmage wrapper adds a MaxMP-Resting feature that, above 95% MP, re-equips Idle gear plus an
+    -- elemental staff every tick, overriding the timer-gated Resting set entirely. We implement our
+    -- own corrected version of that below instead. The wrapper's other addition,
+    -- gcmage.EquipWeaponLoadout(), is redundant since we apply our own loadout unconditionally below.
     gcinclude.DoDefaultOverride(false)
 
-    -- Corrected, self-contained version of gcmage.lua's "MaxMP Resting" feature: once MP tops off
-    -- while resting, there's no more benefit to Resting-tick gear, so switch to an MP-conservation
-    -- idle set instead. Applied AFTER the correct timer-gated Resting call above, so it only ever WINS
-    -- (overrides) rather than racing/blocking it like the original bug - Resting gear still gets its
-    -- correct chance to show for the full window between the 16s timer expiring and MP actually
-    -- reaching 95%. Fill in real gear for IdleMaxMP_Priority if you want this to do anything.
+    -- Corrected, self-contained version of gcmage.lua's MaxMP-Resting feature: once MP tops off while
+    -- resting there's no further benefit to Resting-tick gear, so switch to MP-conservation gear.
+    -- Deliberately applied AFTER the timer-gated Resting call above so it overrides rather than
+    -- pre-empts it - Resting gear still gets the full window between the 16s timer and MP hitting 95%.
+    -- Requires gear in IdleMaxMP_Priority to do anything.
     if (player.Status == 'Resting') then
         if (player.MPP >= 95 or restingMaxMP) then
             restingMaxMP = true
@@ -734,15 +753,15 @@ profile.HandleDefault = function()
     -- Self-contained "Extra mode": while idle (not resting, not engaged - those have their own gear
     -- priorities already) with /extra toggled on and current MP still at or above extraThreshold, stay
     -- in IdleMaxMP-conservation gear instead of normal Idle gear.
-    if (player.Status ~= 'Resting' and player.Status ~= 'Engaged' and gcdisplay.GetToggle('BLUExtra') and player.MP >= extraThreshold) then
+    if (extraThreshold ~= nil and player.Status ~= 'Resting' and player.Status ~= 'Engaged' and gcdisplay.GetToggle('BLUExtra') and player.MP >= extraThreshold) then
         gFunc.EquipSet('IdleMaxMP')
     end
 
-    -- Always equip a TP set while engaged, regardless of the shared /tp toggle's Off/LowAcc/HighAcc
-    -- state (gcmage.DoDefault's built-in TP dispatch only fires when that toggle isn't 'Off', which
-    -- doesn't fit how BLU should play). TP_LowAcc is the base; NIN subjob gear layers on top of that
-    -- if applicable; the /tp toggle's HighAcc layers on top of that again, so HighAcc always wins any
-    -- slot it shares with TP_NIN, regardless of subjob.
+    -- Always equip a TP set while engaged, regardless of the /tp cycle state (gcmage.DoDefault's
+    -- built-in TP dispatch only fires when that cycle isn't 'Off', which doesn't fit how BLU plays).
+    -- Layering order: base set (TP_LowAcc, or TP_Tank_LowAcc for either Tank state) -> TP_NIN if
+    -- subbing NIN -> the HighAcc overlay for whichever family is active. The HighAcc overlay applies
+    -- last so it wins any slot it shares with TP_NIN, regardless of subjob.
     if (player.Status == 'Engaged') then
         local tpCycle = gcdisplay.GetCycle('TP')
 
@@ -777,14 +796,9 @@ profile.HandleDefault = function()
         gFunc.EquipSet('Salvage')
     end
 
-    -- /afhands forces Magus Bazubands into the Hands slot while idle or engaged, overriding whatever
-    -- else would normally go there. Excluded while Resting - Resting_Priority's own Hands choice
-    -- should always win there regardless of this toggle.
-    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
-        gFunc.EquipSet('AFHands')
-    end
+    ApplyAFHands()
 
-            -- Movement gear gets correctly applied earlier via gcinclude.DoDefaultOverride, but later dispatch
+    -- Movement gear gets correctly applied earlier via gcinclude.DoDefaultOverride, but later dispatch
     -- in this same function (TP gear while Engaged, IdleMaxMP while /extra is active) can touch the
     -- same slots and silently overwrite it before it's ever visible. Re-applying it here, after
     -- everything else, gives it the final say whenever you're actually moving.
@@ -811,7 +825,6 @@ end
 
 profile.HandlePrecast = function()
     local action = gData.GetAction()
-    local player = gData.GetPlayer()
 
     gFunc.EquipSet('Precast')
     if (string.contains(action.Skill, 'Blue Magic')) then
@@ -826,12 +839,7 @@ profile.HandlePrecast = function()
         gcinclude.DoCancel(action, castDelay - 0.4)
     end
 
-    -- /afhands also needs to win here and in HandleMidcast, not just HandleDefault - casting a spell
-    -- while idle or engaged applies its own precast/midcast gear (which can include its own Hands
-    -- item) independently of HandleDefault, so without this the toggle would only hold between casts.
-    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
-        gFunc.EquipSet('AFHands')
-    end
+    ApplyAFHands()
 
     LockTPWeapon()
 end
@@ -845,8 +853,7 @@ profile.HandleMidcast = function()
         gcmage.EquipObi(action)
         gcmage.EquipStaff()
     elseif (BluMagPhys:contains(action.Name) or BluPhysStun:contains(action.Name)) then
-        -- Inlined from what used to be a custom gcmelee.EquipBluPhysical() addition, so BLU.lua no
-        -- longer depends on any non-upstream change to gcmelee.lua.
+        -- Kept inline (rather than in gcmelee.lua) so BLU.lua depends only on stock upstream files.
         local physCa = gData.GetBuffCount('Chain Affinity')
         local physBa = gData.GetBuffCount('Burst Affinity')
         local physDiff = gData.GetBuffCount('Diffusion')
@@ -863,8 +870,9 @@ profile.HandleMidcast = function()
         elseif (BluPhysAGI:contains(action.Name)) then gFunc.EquipSet('BluPhysical_AGI')
         elseif (BluPhysCHR:contains(action.Name)) then gFunc.EquipSet('BluPhysical_CHR')
         end
-        if (gcdisplay.GetCycle('TP') == 'HighAcc') and (BluPhysMulti:contains(action.Name)) then gFunc.EquipSet('TP_HighAcc')
-end
+        if (gcdisplay.GetCycle('TP') == 'HighAcc' and BluPhysMulti:contains(action.Name)) then
+            gFunc.EquipSet('TP_HighAcc')
+        end
 
         -- Stun-type spells (Head Butt, Frypan, etc.) are physical, not magical - they now get
         -- BluPhysical as their base like every other physical Blue Magic spell, with BluStun layered
@@ -883,31 +891,26 @@ end
             elseif (BluMagEnmity:contains(action.Name)) then gFunc.EquipSet('Enmity')
             elseif (action.Name == 'White Wind') then gFunc.EquipSet('WhiteWind')
             else
-                -- Generic magic-damage nuke (including Everyone's Grudge/Tenebral Crush, which used to
-                -- get a dedicated BluDark set - now just fall through to their stat-mod classification
-                -- like everything else): layer the stat-specific subset on top of BluMagical. INT is
-                -- the default for anything not explicitly MND/CHR/INT-classified above.
+                -- Generic magic-damage nuke: layer the stat-specific subset on top of the base
+                -- BluMagical set already applied above, based on the spell's dominant stat mod.
                 if (BluMagMND:contains(action.Name)) then gFunc.EquipSet('BluMagical_MND')
                 elseif (BluMagCHR:contains(action.Name)) then gFunc.EquipSet('BluMagical_CHR')
                 elseif (BluMagINT:contains(action.Name)) then gFunc.EquipSet('BluMagical_INT')
-                else gFunc.EquipSet('BluMagical') -- unclassified spells still default to INT
+                else gFunc.EquipSet('BluMagical') -- unclassified: keep the base set already applied above
                 end
 
-                -- Mirrors gcmage.lua's EquipHealing/EquipDivine trigger for Uggalepih Pendant (MP
-                -- recovered on HP recovery magic cast) - self-contained here since BLU's dispatch never
-                -- goes through those gcmage functions. Only applies to the INT/MND/CHR nuke spells
-                -- above, not Cure (that trigger is WHM-specific). Reuses the shared uggalepih_pendant
-                -- item set from gcmage.AppendSets rather than duplicating it.
+                -- Mirrors gcmage.lua's Uggalepih Pendant trigger (swaps it in when the cast will
+                -- drop you below 51% MP) - self-contained here since BLU's magic dispatch never goes
+                -- through the gcmage functions that would normally apply it. Scoped to damage nukes
+                -- only, not Cure. Reuses the shared uggalepih_pendant set from gcmage.AppendSets.
                 if (action.MppAftercast < 51) then
                     gFunc.EquipSet('uggalepih_pendant')
                 end
 
-                -- Self-contained "Extra mode": if /extra is on and you'll still have plenty of MP left
-                -- after this cast, layer the stat-appropriate _Extra variant on top instead of the
-                -- regular BluMagical_INT/MND/CHR set just applied above - the BLU-specific equivalent
-                -- of NukeExtra/etc, checked against post-cast MP since the point is "can I afford
-                -- another one right after this."
-                if (gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
+                -- Extra mode: if /extra is on and enough MP remains after this cast, layer the
+                -- stat-appropriate _Extra variant over the regular set applied above. Checked against
+                -- post-cast MP, since the question is "can I afford another one right after this."
+                if (extraThreshold ~= nil and gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
                     if (BluMagMND:contains(action.Name)) then gFunc.EquipSet('BluMagical_MND_Extra')
                     elseif (BluMagCHR:contains(action.Name)) then gFunc.EquipSet('BluMagical_CHR_Extra')
                     else gFunc.EquipSet('BluMagical_INT_Extra') -- covers BluMagINT and the unclassified default
@@ -947,7 +950,7 @@ end
         -- via a subjob through the DoMidcast fallback above). gcmage.lua's own StoneskinExtra/
         -- PhalanxExtra dispatch inside EquipEnhancing is hard-gated to MainJob == 'BLM', so it can
         -- never fire for BLU - same story as NukeExtra, handled here instead.
-        if (gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
+        if (extraThreshold ~= nil and gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
             if (action.Name == 'Stoneskin') then
                 gFunc.EquipSet('StoneskinExtra')
             elseif (action.Name == 'Phalanx') then
@@ -956,12 +959,7 @@ end
         end
     end
 
-    -- /afhands needs to win here too, same reasoning as HandlePrecast - midcast gear applies
-    -- independently of HandleDefault and can include its own Hands item.
-    local player = gData.GetPlayer()
-    if (gcdisplay.GetToggle('AFHands') and player.Status ~= 'Resting') then
-        gFunc.EquipSet('AFHands')
-    end
+    ApplyAFHands()
 
     LockTPWeapon()
 end
