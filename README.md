@@ -6,7 +6,7 @@ Now that this LUA has been live on HXI's ToAU launch it's gone through a few ver
 
 Please join my discord here: https://discord.gg/ktAwae97Px and use the #bug-reports forum if you find anything broken specifically with the LUA. As a note, this should only be used for bugs with my LUA and not bugs with Luashitacast or Rag's files.
 
-I will also be pinging the discord server with update to the LUA so I encourage you to join for that as well!
+I will also be pinging the discord server with updates to the LUA so I encourage you to join for that as well!
 
 **Now some disclaimers:**
 - Claude did a lot of the work in creating the BLU.lua so there is absolutely a possibility of redundant code, weird workarounds for problems, etc. I've made efforts to clean it up, but AI gonna AI.
