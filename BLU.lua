@@ -24,11 +24,10 @@ local extraThreshold = nil
 -- Blue Magic classification tables. These decide which gear set HandleMidcast reaches for based on the spell being cast.
 
 local BluMagPhys = T{'Foot Kick', 'Sprout Smack', 'Wild Oats', 'Power Attack', 'Queasyshroom', 'Battle Dance', 'Feather Storm', 'Helldive', 'Bludgeon', 'Claw Cyclone', 'Screwdriver', 'Grand Slam', 'Smite of Rage', 'Pinecone Bomb', 'Jet Stream', 'Uppercut', 'Terror Touch', 'Mandibular Bite', 'Sickle Slash', 'Dimensional Death', 'Spiral Spin', 'Death Scissors', 'Seedspray', 'Body Slam', 'Hydro Shot', 'Frenetic Rip', 'Spinal Cleave', 'Hysteric Barrage', 'Asuran Claws', 'Cannonball', 'Disseverment', 'Ram Charge', 'Vertical Cleave', 'Final Sting', 'Goblin Rush', 'Vanity Dive', 'Whirl of Rage', 'Benthic Typhoon', 'Quad. Continuum', 'Empty Thrash', 'Delta Thrust', 'Heavy Strike', 'Quadrastrike', 'Tourbillion', 'Amorphic Spikes', 'Barbed Crescent', 'Bilgestorm', 'Bloodrake', 'Glutinous Dart', 'Paralyzing Triad', 'Thrashing Assault', 'Sinker Drill', 'Sweeping Gouge', 'Saurian Slide'}
-local BluMagDebuff = T{'Filamented Hold', 'Cimicine Discharge', 'Demoralizing Roar', 'Venom Shell', 'Light of Penance', 'Sandspray', 'Auroral Drape', 'Frightful Roar', 'Enervation', 'Infrasonics', 'Lowing', 'CMain Wave', 'Awful Eye', 'Voracious Trunk', 'Sheep Song', 'Soporific', 'Yawn', 'Dream Flower', 'Chaotic Eye', 'Sound Blast', 'Blank Gaze', 'Stinking Gas', 'Geist Wall', 'Feather Tickle', 'Reaving Wind', 'Mortal Ray', 'Absolute Terror', 'Blistering Roar', 'Cruel Joke'}
-local BluMagBuff = T{'Zephyr Mantle', 'Cocoon', 'Refueling', 'Feather Barrier', 'Memento Mori', 'Warm-Up', 'Amplification', 'Triumphant Roar', 'Saline Coat', 'Reactor Cool', 'Plasma Charge', 'Regeneration', 'Animating Wail', 'Battery Charge', 'Winds of Promy.', 'Barrier Tusk', 'Orcish Counterstance', 'Pyric Bulwark', 'Nat. Meditation', 'Restoral', 'Erratic Flutter', 'Carcharian Verve', 'Harden Shell', 'Mighty Guard'}
+local BluMagDebuff = T{'Filamented Hold', 'Cimicine Discharge', 'Demoralizing Roar', 'Venom Shell', 'Light of Penance', 'Sandspray', 'Auroral Drape', 'Frightful Roar', 'Enervation', 'Infrasonics', 'Lowing', 'CMain Wave', 'Awful Eye', 'Voracious Trunk', 'Sheep Song', 'Soporific', 'Yawn', 'Dream Flower', 'Chaotic Eye', 'Sound Blast', 'Blank Gaze', 'Stinking Gas', 'Geist Wall', 'Feather Tickle', 'Reaving Wind', 'Mortal Ray', 'Absolute Terror', 'Blistering Roar', 'Cruel Joke', 'Actinic Burst', 'Jettatura', 'Temporal Shift'}
+local BluMagBuff = T{'Zephyr Mantle', 'Cocoon', 'Refueling', 'Feather Barrier', 'Memento Mori', 'Warm-Up', 'Amplification', 'Triumphant Roar', 'Saline Coat', 'Reactor Cool', 'Plasma Charge', 'Regeneration', 'Animating Wail', 'Battery Charge', 'Winds of Promy.', 'Barrier Tusk', 'Orcish Counterstance', 'Pyric Bulwark', 'Nat. Meditation', 'Restoral', 'Erratic Flutter', 'Carcharian Verve', 'Harden Shell', 'Mighty Guard', 'Exuviation', 'Fantod'}
 local BluMagSkill = T{'Metallic Body', 'Diamondhide', 'Magic Barrier', 'Occultation', 'Atra. Libations'}
 local BluMagCure = T{'Pollen', 'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Plenilune Embrace'}
-local BluMagEnmity = T{'Actinic Burst', 'Exuviation', 'Fantod', 'Jettatura', 'Temporal Shift'}
 
 -- Physical Blue Magic spells that stun. These dispatch through the physical branch like any other
 -- physical spell, with the BluStun set layered on top as a stun-specific overlay.
@@ -46,15 +45,23 @@ local BluPhysAGI = T{'Benthic Typhoon', 'Feather Storm', 'Helldive', 'Hydro Shot
 local BluPhysCHR = T{'Bludgeon'}
 -- Multi-hit physical Blue Magic. These benefit disproportionately from accuracy (every hit can miss
 -- independently), so they additionally pull the TP_HighAcc set when the /tp cycle is on HighAcc.
-local BluPhysMulti = T{'Bludgeon', 'Jet Stream', 'Quad. Continuum', 'Frenetic Rip', 'Hysteric Barrage', 'Disseverment'}
+local BluPhysMulti = T{'Bludgeon', 'Jet Stream', 'Quad. Continuum', 'Frenetic Rip', 'Hysteric Barrage', 'Disseverment', 'Goblin Rush'}
 
 -- Magical Blue Magic stat-mod sub-classification, same source. Only applies to the generic
 -- magic-damage fallback in HandleMidcast - Cure, Enmity and White Wind spells are matched earlier and
 -- use their own dedicated sets. Anything not listed in any of the three tables below falls through to
 -- the base BluMagical set.
-local BluMagMND = T{'Acrid Stream', 'Magic Hammer', 'Mind Blast'}
+local BluMagMND = T{'Acrid Stream', 'Magic Hammer', 'Mind Blast', 'Rail Cannon'}
 local BluMagCHR = T{'Eyes On Me', 'Mysterious Light'}
 local BluMagINT = T{'Sandspin', 'Cursed Sphere', 'Bomb Toss', 'Death Ray', 'Blitzstrahl', 'Ice Break', 'Maelstrom', 'Corrosive Ooze', 'Firespit', 'Regurgitation'}
+
+-- Spells that benefit from boosted Enmity. When the /hate toggle is on, the Enmity set is overlaid on
+-- top of whatever gear the spell would normally get, so its slots win wherever the two overlap. Covers
+-- both Blue Magic and subjob White Magic (Cure III, Dispel, Sleep, Blind).
+local HateSpells = T{'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Blank Gaze', 'Geist Wall',
+    'Sheep Song', 'Soporific', 'Yawn', 'Terror Touch', 'Light of Penance', 'Actinic Burst',
+    'Jettatura', 'Temporal Shift', 'Exuviation', 'Fantod', 'Plenilune Embrace', 'Restoral',
+    'Cure III', 'Dispel', 'Sleep', 'Blind'}
 
 -- Breath spells use a distinct HP-based damage formula rather than scaling off STR/DEX/INT/etc, so
 -- they get their own dedicated max-HP set rather than fitting the physical/magical split above.
@@ -153,16 +160,23 @@ local sets = {
     SIRD = {},
     SIRD_NIN = {},
 
-    -- Direct table field access in gcmage.lua's SetupMidcastDelay, gated only by the 'Hate' toggle plus
-    -- casting Cure III/Cure IV by name - not actually MainJob-restricted in the code despite living
-    -- alongside WHM-specific logic, so reachable via a WHM subjob too (confirmed - PLD needed these too).
-    Cheat_C3HPDown = {},
-    Cheat_C4HPDown = {},
-    Cheat_HPUp = {},
+    -- "Cure cheat" sets, used by ApplyCheatCure when /hate is on and you cure YOURSELF. Your HP is
+    -- briefly dropped so the cure heals for more (and generates more enmity), then restored just before
+    -- the cast lands. Leave empty to disable. Also read directly by gcmage.lua, so they must exist by
+    -- these exact bare names even if unused.
+    Cheat_C3HPDown = {}, -- Cure III, and Wild Carrot
+    Cheat_C4HPDown = {}, -- Cure IV, and Magic Fruit
+    Cheat_HPUp = {},     -- applied on top of either, just before the cast completes
 
     -- Forced into the Hands slot by /afhands (see HandleDefault) while idle or engaged.
     AFHands_Priority = {
         Hands = {'Magus Bazubands'},
+    },
+
+    -- Forced into the Body slot by /refbody while Engaged (see ApplyRefBody). A TP body that also
+    -- grants Refresh when MP is low.
+    RefBody_Priority = {
+        Body = {'Mirage Jubbah'},
     },
 
     -- Everything below is stubbed empty so nothing gcmage.DoMidcast/DoDefault/DoDefaultOverride/
@@ -569,6 +583,74 @@ local function ApplyAFHands()
     end
 end
 
+-- /refbody forces Mirage Jubbah into the Body slot while Engaged - a TP body that also grants Refresh
+-- when MP is low. Only applies while Engaged; no other conditions. Called from the same three places
+-- as ApplyAFHands so it holds through casts as well as normal idle/engaged ticks.
+local function ApplyRefBody()
+    if (gcdisplay.GetToggle('RefBody') and gData.GetPlayer().Status == 'Engaged') then
+        gFunc.EquipSet('RefBody')
+    end
+end
+
+-- /hate overlays the Enmity set on spells that benefit from boosted Enmity (see HateSpells above),
+-- matching the behaviour of the /hate command in the RDM and DRK profiles. Applied last in the midcast
+-- dispatch so its slots win over whatever gear the spell would otherwise get.
+local function ApplyHate(action)
+    if (gcdisplay.GetToggle('Hate') and HateSpells:contains(action.Name)) then
+        gFunc.EquipSet('Enmity')
+    end
+end
+
+-- Emulates the "cure cheat" that gcmage does for RDM/WHM: while /hate is on and you're curing
+-- YOURSELF, briefly drop to a low-HP set so the cure heals for more (and generates more enmity), then
+-- swap back to an HP-up set just before the cast lands. gcmage's version lives in SetupMidcastDelay,
+-- which BLU's own HandlePrecast never calls, so it's reimplemented here.
+--   Cure III / Wild Carrot  -> Cheat_C3HPDown
+--   Cure IV  / Magic Fruit  -> Cheat_C4HPDown
+-- then Cheat_HPUp on top of either, right before the cast completes.
+local CheatC3Spells = T{'Cure III', 'Wild Carrot'}
+local CheatC4Spells = T{'Cure IV', 'Magic Fruit'}
+
+local function ApplyCheatCure(action, castDelay)
+    if (gcdisplay.GetToggle('Hate') ~= true) then return end
+
+    local isC3 = CheatC3Spells:contains(action.Name)
+    local isC4 = CheatC4Spells:contains(action.Name)
+    if (not isC3 and not isC4) then return end
+
+    -- Self-target only - the whole point is lowering your own HP so your own cure heals more.
+    local target = gData.GetActionTarget()
+    local me = AshitaCore:GetMemoryManager():GetParty():GetMemberName(0)
+    if (target == nil or target.Name ~= me) then return end
+
+    local hpDown = isC3 and sets.Cheat_C3HPDown or sets.Cheat_C4HPDown
+    local hpUp = sets.Cheat_HPUp
+
+    -- Keep the active weapon on while engaged or holding TP, so the swap doesn't drop it.
+    if (gcdisplay.GetCycle('TP') ~= 'Off') then
+        local player = gData.GetPlayer()
+        if (player.Status == 'Engaged' or player.TP > 0) then
+            local weapon = sets['Weapon_Loadout_' .. GetAutoWeaponLoadout() .. '_Priority']
+            if (weapon ~= nil) then
+                hpDown = gFunc.Combine(hpDown, weapon)
+                hpUp = gFunc.Combine(hpUp, weapon)
+            end
+        end
+    end
+
+    local function doCheat()
+        gFunc.ForceEquipSet(hpDown)
+        gFunc.ForceEquipSet(hpUp)
+    end
+
+    local cheatDelay = castDelay - 0.4
+    if (cheatDelay <= 0) then
+        doCheat()
+    else
+        doCheat:once(cheatDelay)
+    end
+end
+
 local function LockTPWeapon()
     local player = gData.GetPlayer()
     -- Mimics the WHM/RDM pattern of gating the weapon/range/ammo lock behind the /tp toggle - unlike
@@ -626,18 +708,20 @@ profile.OnLoad = function()
 
     gcdisplay.CreateToggle('BLUExtra', false)
     gcdisplay.CreateToggle('AFHands', false)
+    gcdisplay.CreateToggle('RefBody', false)
+    gcdisplay.CreateToggle('Hate', false)
 
     -- weapon/wl are already aliased automatically by gcmage.Load() above (part of its own AliasList),
     -- but weaponauto/extra/afhands are entirely our own custom commands and need their own explicit
     -- alias registration, or Ashita has no idea to route them to HandleCommand at all.
-    gcinclude.SetAlias(T{'weaponauto', 'extra', 'afhands'})
+    gcinclude.SetAlias(T{'weaponauto', 'extra', 'afhands', 'refbody'})
 
     profile.SetMacroBook()
 end
 
 profile.OnUnload = function()
     gcmage.Unload()
-    gcinclude.ClearAlias(T{'weaponauto', 'extra', 'afhands'})
+    gcinclude.ClearAlias(T{'weaponauto', 'extra', 'afhands', 'refbody'})
 end
 
 profile.HandleCommand = function(args)
@@ -654,6 +738,16 @@ profile.HandleCommand = function(args)
     elseif (args[1] == 'afhands') then
         gcdisplay.AdvanceToggle('AFHands')
         gcinclude.Message('AF Hands', gcdisplay.GetToggle('AFHands'))
+        return
+    elseif (args[1] == 'refbody') then
+        gcdisplay.AdvanceToggle('RefBody')
+        gcinclude.Message('Refresh Body', gcdisplay.GetToggle('RefBody'))
+        return
+    elseif (args[1] == 'hate') then
+        -- gcmage.DoCommands has its own /hate handler, but it's gated to MainJob RDM/WHM so it never
+        -- fires for BLU. Handled here instead. The alias itself is already registered by gcmage.
+        gcdisplay.AdvanceToggle('Hate')
+        gcinclude.Message('Hate', gcdisplay.GetToggle('Hate'))
         return
     end
 
@@ -797,6 +891,7 @@ profile.HandleDefault = function()
     end
 
     ApplyAFHands()
+    ApplyRefBody()
 
     -- Movement gear gets correctly applied earlier via gcinclude.DoDefaultOverride, but later dispatch
     -- in this same function (TP gear while Engaged, IdleMaxMP while /extra is active) can touch the
@@ -839,7 +934,10 @@ profile.HandlePrecast = function()
         gcinclude.DoCancel(action, castDelay - 0.4)
     end
 
+    ApplyCheatCure(action, castDelay)
+
     ApplyAFHands()
+    ApplyRefBody()
 
     LockTPWeapon()
 end
@@ -881,6 +979,12 @@ profile.HandleMidcast = function()
     elseif (action.Skill == 'Blue Magic') then
         if (BluMagBuff:contains(action.Name)) then
             gFunc.EquipSet('ConserveMP') -- non-skill-scaling buffs (Refueling, Plasma Charge, etc.)
+        elseif (action.Name == 'Metallic Body') then
+            -- Horizon uses a custom formula for Metallic Body that scales off MND in addition to Blue
+            -- Magic Skill, unlike the other BluMagSkill spells. Apply the MND set as the base, then
+            -- overlay BluSkill so its slots win wherever the two sets overlap.
+            gFunc.EquipSet('BluMagical_MND')
+            gFunc.EquipSet('BluSkill')
         elseif (BluMagSkill:contains(action.Name)) then
             gFunc.EquipSet('BluSkill') -- skill-scaling buffs/defenses (e.g. Zephyr Mantle)
         elseif (BluMagDebuff:contains(action.Name)) then
@@ -888,7 +992,6 @@ profile.HandleMidcast = function()
         else
             gFunc.EquipSet('BluMagical')
             if (BluMagCure:contains(action.Name)) then gFunc.EquipSet('Cure')
-            elseif (BluMagEnmity:contains(action.Name)) then gFunc.EquipSet('Enmity')
             elseif (action.Name == 'White Wind') then gFunc.EquipSet('WhiteWind')
             else
                 -- Generic magic-damage nuke: layer the stat-specific subset on top of the base
@@ -960,6 +1063,8 @@ profile.HandleMidcast = function()
     end
 
     ApplyAFHands()
+    ApplyRefBody()
+    ApplyHate(action)
 
     LockTPWeapon()
 end
