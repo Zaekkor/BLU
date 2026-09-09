@@ -15,7 +15,8 @@ I will also be pinging the discord server with updates to the LUA so I encourage
 - The gear sets used in this LUA are placeholders from testing. They are definitely not perfect, and are using stuff like Morrigan's set which we won't have as of time of release of this file on Horizon XI. Obviously you'll need to make your own changes there. **Please pay special notice to any comments added to gearsets, though!**
 - This lua is set up to work with the level sync priority feature LuAshitacast utilizes, so you can add gear in like this: `Main = {'Perdu Hanger', 'Centurion\'s Sword', 'Fire Sword'},` and it will try to equip each sequentially until it lands on one you can equip.
 
-For the time being, I am one of the main sources of a BLU lua compatible with Rag's files. Rag has stated that he is not currently playing FFXI or Horizon at all and that any DMs asking him if he's going to implement ToAU jobs will just cause him to block you. Please do not message him about any upcoming BLU lua work and absolutely do not message him regarding tech support for my lua specifically.
-
 - Reference the Commands.md file to understand all relevant commands for this lua.
 - Reference the Update-Instructions.md file for instructions on how to properly update from older versions.
+
+
+For the time being, I am one of the main sources of a BLU lua compatible with Rag's files. Rag has stated that he is not currently playing FFXI or Horizon at all and that any DMs asking him if he's going to implement ToAU jobs will just cause him to block you. Please do not message him about any upcoming BLU lua work and absolutely do not message him regarding tech support for my lua specifically.
