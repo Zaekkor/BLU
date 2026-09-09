@@ -16,3 +16,6 @@ I will also be pinging the discord server with updates to the LUA so I encourage
 - This lua is set up to work with the level sync priority feature LuAshitacast utilizes, so you can add gear in like this: `Main = {'Perdu Hanger', 'Centurion\'s Sword', 'Fire Sword'},` and it will try to equip each sequentially until it lands on one you can equip.
 
 For the time being, I am one of the main sources of a BLU lua compatible with Rag's files. Rag has stated that he is not currently playing FFXI or Horizon at all and that any DMs asking him if he's going to implement ToAU jobs will just cause him to block you. Please do not message him about any upcoming BLU lua work and absolutely do not message him regarding tech support for my lua specifically.
+
+- Added a Commands.md file to cover all relevant commands for this lua.
+- Added an Update-Instructions.md file that instructs how to properly update from older versions.
