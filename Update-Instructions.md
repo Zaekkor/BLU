@@ -5,6 +5,11 @@ you'd lose all your gear. Follow these steps instead.
 
 **Before you start:** make a backup copy of your current BLU.lua somewhere safe.
 
+> **Framework requirement:** this version expects the shared `common/` files (gcmage,
+> gcinclude, gcmelee, gcdisplay, conquest) from Rag's repo at **v3.1.3 or newer**. If yours
+> are older, update those first — the `WeaponBash` set below relies on a function added
+> in v3.1.3, and BLU will log a "Set not found" warning without it.
+
 ---
 
 ## Understanding the file
@@ -100,8 +105,14 @@ These are new or newly-used. They'll be empty in the new file — add gear if yo
 | `BluMagical_MND_Extra_Priority` | Used by `/extra` on MND-based nukes |
 | `BluMagical_CHR_Extra_Priority` | Used by `/extra` on CHR-based nukes |
 | `IdleMaxMP_Priority` | Idle gear once MP is topped off |
+| `WeaponBash` | Weapon swapped in for Weapon Bash when subbing /DRK (see note below) |
 
 Leaving any of them empty is fine — they simply do nothing.
+
+> **`WeaponBash` has no `_Priority` suffix, and shouldn't get one.** The framework looks it
+> up by its plain name, and an empty `_Priority` set doesn't create the plain-name alias, so
+> renaming it would just produce a "Set not found" warning. It only ever fires when you're
+> subbing /DRK, using Weapon Bash, and holding a one-handed or hand-to-hand weapon.
 
 ### Step 5 — Sets that were removed
 
@@ -142,9 +153,18 @@ Load the profile in game. If it loads with no errors, you're good. Then try:
 - `/afhands` and `/refbody` — should print a message and swap the slot.
 - `/hate` — should print a message; cast Wild Carrot or Blank Gaze and check your enmity gear.
 - `/tp` — should cycle through five states now, not three.
+- `/weapon` then `/weaponauto` — should print a message each time and not warn about a
+  missing `Weapon_Loadout_Unknown` set.
 
 **If nothing happens at all and there's no error**, check that the very last line of your
 file is `return profile`. If it's missing, the file loads silently but does nothing.
 
 **If you get `bad argument #1 to 'pairs' (table expected, got nil)`**, a set is missing or
 misnamed — go back to Step 3.
+
+**If you get `Set not found: WeaponBash`**, either the set is missing from your file, or it
+got renamed to `WeaponBash_Priority` — see the note under Step 4.
+
+**If you get `Set not found: Weapon_Loadout_Unknown`**, your `common/` files are older than
+v3.1.3, or `GetAutoWeaponLoadout()` below the line is from an older BLU.lua. Take the new
+version of everything below the divider line.
