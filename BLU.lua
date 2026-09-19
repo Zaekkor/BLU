@@ -30,9 +30,9 @@ local extraThreshold = nil
 -- Blue Magic classification tables. These decide which gear set HandleMidcast reaches for based on the spell being cast.
 
 local BluMagPhys = T{'Foot Kick', 'Sprout Smack', 'Wild Oats', 'Power Attack', 'Queasyshroom', 'Battle Dance', 'Feather Storm', 'Helldive', 'Bludgeon', 'Claw Cyclone', 'Screwdriver', 'Grand Slam', 'Smite of Rage', 'Pinecone Bomb', 'Jet Stream', 'Uppercut', 'Terror Touch', 'Mandibular Bite', 'Sickle Slash', 'Dimensional Death', 'Spiral Spin', 'Death Scissors', 'Seedspray', 'Body Slam', 'Hydro Shot', 'Frenetic Rip', 'Spinal Cleave', 'Hysteric Barrage', 'Asuran Claws', 'Cannonball', 'Disseverment', 'Ram Charge', 'Vertical Cleave', 'Final Sting', 'Goblin Rush', 'Vanity Dive', 'Whirl of Rage', 'Benthic Typhoon', 'Quad. Continuum', 'Empty Thrash', 'Delta Thrust', 'Heavy Strike', 'Quadrastrike', 'Tourbillion', 'Amorphic Spikes', 'Barbed Crescent', 'Bilgestorm', 'Bloodrake', 'Glutinous Dart', 'Paralyzing Triad', 'Thrashing Assault', 'Sinker Drill', 'Sweeping Gouge', 'Saurian Slide'}
-local BluMagDebuff = T{'Filamented Hold', 'Cimicine Discharge', 'Demoralizing Roar', 'Venom Shell', 'Light of Penance', 'Sandspray', 'Auroral Drape', 'Frightful Roar', 'Enervation', 'Infrasonics', 'Lowing', 'CMain Wave', 'Awful Eye', 'Voracious Trunk', 'Sheep Song', 'Soporific', 'Yawn', 'Dream Flower', 'Chaotic Eye', 'Sound Blast', 'Blank Gaze', 'Stinking Gas', 'Geist Wall', 'Feather Tickle', 'Reaving Wind', 'Mortal Ray', 'Absolute Terror', 'Blistering Roar', 'Cruel Joke', 'Actinic Burst', 'Jettatura', 'Temporal Shift'}
+local BluMagDebuff = T{'Filamented Hold', 'Cimicine Discharge', 'Demoralizing Roar', 'Venom Shell', 'Light of Penance', 'Sandspray', 'Auroral Drape', 'Frightful Roar', 'Enervation', 'Infrasonics', 'Lowing', 'Cold Wave', 'Awful Eye', 'Voracious Trunk', 'Sheep Song', 'Soporific', 'Yawn', 'Dream Flower', 'Chaotic Eye', 'Sound Blast', 'Blank Gaze', 'Stinking Gas', 'Geist Wall', 'Feather Tickle', 'Reaving Wind', 'Mortal Ray', 'Absolute Terror', 'Blistering Roar', 'Cruel Joke', 'Actinic Burst', 'Jettatura', 'Temporal Shift', 'MP Drainkiss'}
 local BluMagBuff = T{'Zephyr Mantle', 'Cocoon', 'Refueling', 'Feather Barrier', 'Memento Mori', 'Warm-Up', 'Amplification', 'Triumphant Roar', 'Saline Coat', 'Reactor Cool', 'Plasma Charge', 'Regeneration', 'Animating Wail', 'Battery Charge', 'Winds of Promy.', 'Barrier Tusk', 'Orcish Counterstance', 'Pyric Bulwark', 'Nat. Meditation', 'Restoral', 'Erratic Flutter', 'Carcharian Verve', 'Harden Shell', 'Mighty Guard', 'Exuviation', 'Fantod'}
-local BluMagSkill = T{'Metallic Body', 'Diamondhide', 'Magic Barrier', 'Occultation', 'Atra. Libations'}
+local BluMagSkill = T{'Metallic Body', 'Diamondhide', 'Magic Barrier', 'Occultation', 'Atra. Libations', 'Blood Drain', 'Digest', 'Blood Saber', 'Osmosis'}
 local BluMagCure = T{'Pollen', 'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Plenilune Embrace'}
 
 -- Physical Blue Magic spells that stun. These dispatch through the physical branch like any other
@@ -57,9 +57,10 @@ local BluPhysMulti = T{'Bludgeon', 'Jet Stream', 'Quad. Continuum', 'Frenetic Ri
 -- magic-damage fallback in HandleMidcast - Cure, Enmity and White Wind spells are matched earlier and
 -- use their own dedicated sets. Anything not listed in any of the three tables below falls through to
 -- the base BluMagical set.
-local BluMagMND = T{'Acrid Stream', 'Magic Hammer', 'Mind Blast', 'Rail Cannon'}
+local BluMagMND = T{'Acrid Stream', 'Magic Hammer', 'Mind Blast', 'Rail Cannon', 'Everyone\'s Grudge'}
 local BluMagCHR = T{'Eyes On Me', 'Mysterious Light'}
-local BluMagINT = T{'Sandspin', 'Cursed Sphere', 'Bomb Toss', 'Death Ray', 'Blitzstrahl', 'Ice Break', 'Maelstrom', 'Corrosive Ooze', 'Firespit', 'Regurgitation'}
+local BluMagINT = T{'Sandspin', 'Cursed Sphere', 'Bomb Toss', 'Death Ray', 'Blitzstrahl', 'Ice Break', 'Maelstrom', 'Corrosive Ooze', 'Firespit', 'Regurgitation', 'Blastbomb', 'Leafstorm', 'Thermal Pulse', 'Water Bomb', 'Dark Orb'}
+local BluMagDEX = T{'Charged Whisker'}
 
 -- Spells that benefit from boosted Enmity. When the /hate toggle is on, the Enmity set is overlaid on
 -- top of whatever gear the spell would normally get, so its slots win wherever the two overlap. Covers
@@ -228,10 +229,11 @@ TP_Ear2_Priority = {
 
     -- The below sets are layered on top of BluMagical_Priority for magic-damage fallback based on each
     -- spell's dominant stat mod (see BluMagMND/CHR/INT classification above; BluMagical_Priority is still the
-    -- fallback default for any spell not explicitly classified in one of those three tables).
+    -- fallback default for any spell not explicitly classified in one of those four tables).
     BluMagical_INT_Priority = {},
     BluMagical_MND_Priority = {},
     BluMagical_CHR_Priority = {},
+    BluMagical_DEX_Priority = {},
 
     -- Layered on top of the base BluMagical_INT/MND/CHR set (instead of it) when /extra mode is on
     -- and you'll still have plenty of MP left after the cast (see extraThreshold) - the BLU-specific
@@ -240,6 +242,7 @@ TP_Ear2_Priority = {
     BluMagical_INT_Extra_Priority = {},
     BluMagical_MND_Extra_Priority = {},
     BluMagical_CHR_Extra_Priority = {},
+    BluMagical_DEX_Extra_Priority = {},
 
     BluMagicAccuracy_Priority = {},
     BluStun_Priority = {},
@@ -796,6 +799,7 @@ profile.HandleMidcast = function()
                 -- BluMagical set already applied above, based on the spell's dominant stat mod.
                 if (BluMagMND:contains(action.Name)) then gFunc.EquipSet('BluMagical_MND')
                 elseif (BluMagCHR:contains(action.Name)) then gFunc.EquipSet('BluMagical_CHR')
+                elseif (BluMagDEX:contains(action.Name)) then gFunc.EquipSet('BluMagical_DEX')
                 elseif (BluMagINT:contains(action.Name)) then gFunc.EquipSet('BluMagical_INT')
                 else gFunc.EquipSet('BluMagical') -- unclassified: keep the base set already applied above
                 end
@@ -814,6 +818,7 @@ profile.HandleMidcast = function()
                 if (extraThreshold ~= nil and gcdisplay.GetToggle('BLUExtra') and action.MpAftercast >= extraThreshold) then
                     if (BluMagMND:contains(action.Name)) then gFunc.EquipSet('BluMagical_MND_Extra')
                     elseif (BluMagCHR:contains(action.Name)) then gFunc.EquipSet('BluMagical_CHR_Extra')
+                    elseif (BluMagDEX:contains(action.Name)) then gFunc.EquipSet('BluMagical_DEX_Extra')
                     else gFunc.EquipSet('BluMagical_INT_Extra') -- covers BluMagINT and the unclassified default
                     end
                 end
