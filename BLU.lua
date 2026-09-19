@@ -1,13 +1,19 @@
 local profile = {}
 
 -- Approximate Fast Cast % from gear listed in the Precast set below. Adjust if you change that set.
-local fastCastValue = 0.10
+local fastCastValue = 0
 
 -- These mirror gcmage.DoDefault's subjob MaxMP convenience params (see RDM.lua). BLU commonly subs
 -- NIN, which has no MP-conservation idle gear convention like WHM/BLM/RDM/DRK subs do, so these are
 -- left nil (disabled) by default. Fill in a value here if you want IdleMaxMP gear at a specific
 -- subjob MP threshold.
+--
+-- Only WHM/BLM/RDM/DRK have their own dedicated slot in gcmage. Every other subjob - NIN, THF, WAR,
+-- and so on - shares the single catch-all that ninSJMaxMP feeds, so without thfSJMaxMP below a THF
+-- sub would simply inherit whatever ninSJMaxMP is set to. thfSJMaxMP overrides that while subbing
+-- THF; leave it nil to keep the old shared behaviour. See GetCatchAllSJMaxMP below the line.
 local ninSJMaxMP = nil
+local thfSJMaxMP = nil
 local whmSJMaxMP = nil
 local blmSJMaxMP = nil
 local rdmSJMaxMP = nil
@@ -68,12 +74,12 @@ local HateSpells = T{'Healing Breeze', 'Wild Carrot', 'Magic Fruit', 'Blank Gaze
 local BluMagBreath = T{'Bad Breath', 'Flying Hip Press', 'Frost Breath', 'Heat Breath', 'Hecatomb Wave', 'Magnetite Cloud', 'Poison Breath', 'Radiant Breath', 'Self-Destruct', 'Thunder Breath', 'Vapor Spray', 'Wind Breath'}
 
 
-
+-- Do not touch this variable, it is auto-set when level syncing.
 local Settings = {
     CurrentLevel = 0,
 }
 
--- Set true by /weapon or /wl (see HandleCommand), false by /weaponauto. Controls whether
+-- Do not touch this variable, it is auto set. It gets set true by /weapon or /wl (see HandleCommand), false by /weaponauto. Controls whether
 -- GetAutoWeaponLoadout uses the SubJob-based auto-selection or the manually-toggled cycle value.
 local weaponLoadoutManualOverride = false
 
@@ -84,63 +90,17 @@ local restingMaxMP = false
 
 
 local sets = {
-    Idle_Priority = {
-        Ammo = {'Tiphia Sting'},
-        Head = {'Crimson Mask'},
-        Neck = {'Peacock Charm'},
-        Ear1 = {'Ethereal Earring'},
-        Ear2 = {'Merman\'s Earring'},
-        Body = {'Morrigan\'s Robe'},
-        Hands = {'Denali Wristbands'},
-        Ring1 = {'Merman\'s Ring'},
-        Ring2 = {'Merman\'s Ring'},
-        Back = {'Umbra Cape'},
-        Waist = {'Speed Belt'},
-        Legs = {'Homam Cosciales'},
-        Feet = {'Crimson Greaves'},
-    },
+ 
+    Idle_Priority = {},
     IdleALT_Priority = {},
-    IdleMaxMP_Priority = {
-        Ammo = {'Hedgehog Bomb'},
-        Head = {'Walahra Turban'},
-        Neck = {'Beak Necklace'},
-        Ear1 = {'Antivenom Earring'},
-        Ear2 = {'Phtm. Earring +1'},
-        Body = {'Crm. Scale Mail'},
-        Hands = {'Morrigan\'s Cuffs'},
-        Ring1 = {'Astral Ring'},
-        Ring2 = {'Astral Ring'},
-        Back = {'Errant Cape'},
-        Waist = {'Hierarch Belt'},
-        Legs = {'Homam Cosciales'},
-        Feet = {'Homam Gambieras'},
-    },
-    Resting_Priority = {
-        Main = {'Pluto\'s Staff'},
-        Sub = 'displaced',
-        Head = {'Yigit Turban'},
-        Neck = {'Beak Necklace'},
-        Ear1 = {'Antivenom Earring'},
-        Ear2 = {'Relaxing Earring'},
-        Body = {'Yigit Gomlek'},
-        Hands = {'Genie Gages'},
-        Ring1 = {'Merman\'s Ring'},
-        Ring2 = {'Merman\'s Ring'},
-        Back = {'Umbra Cape'},
-        Waist = {'Hierarch Belt'},
-        Legs = {'Yigit Seraweels'},
-        Feet = {'Arborist Nails'},
-    },
+    IdleMaxMP_Priority = {},
+    Resting_Priority = {},
     Town = {},
-    Movement_Priority = {
-        Legs = {'Crimson Cuisses'},
-    },
-    Movement_TP_Priority = {
-        Legs = {'Crimson Cuisses'},
-    },
+    Movement_Priority = {},
+    Movement_TP_Priority = {},
     Override = {},
 
-    DT_Priority = {Head = 'Darksteel Cap +1'},
+    DT_Priority = {},
     DTNight = {},
     MDT = {},
     FireRes = {},
@@ -187,36 +147,8 @@ local sets = {
 
     -- Enhancing Magic / Stoneskin (Utsusemi, Stoneskin, Phalanx, etc. from a subjob spell)
     Enhancing_Priority = {},
-    Stoneskin_Priority = {
-        Ammo = {'Hedgehog Bomb'},
-        Head = {'Yigit Turban'},
-        Neck = {'Justice Badge'},
-        Ear1 = {'Loquac. Earring'},
-        Ear2 = {'Cmn. Earring'},
-        Body = {'Errant Hpl.'},
-        Hands = {'Yigit Gages'},
-        Ring1 = {'Aqua Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
-    StoneskinExtra_Priority = {
-        Ammo = {'Hedgehog Bomb'},
-        Head = {'Yigit Turban'},
-        Neck = {'Justice Badge'},
-        Ear1 = {'Loquac. Earring'},
-        Ear2 = {'Antivenom Earring'},
-        Body = {'Crm. Scale Mail'},
-        Hands = {'Yigit Gages'},
-        Ring1 = {'Astral Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
+    Stoneskin_Priority = {},
+    StoneskinExtra_Priority = {},
     PhalanxExtra_Priority = {},
 
     -- Dark Magic / Ninjutsu Stun
@@ -236,22 +168,7 @@ local sets = {
     -- TP_HighAcc_Priority layers on top when the toggle is HighAcc; TP_NIN_Priority layers on top
     -- when subbing NIN. TP_HighAcc always applies after TP_NIN, so it wins any overlapping slot
     -- regardless of subjob.
-    TP_LowAcc_Priority = {
-        Range = 'displaced',
-        Ammo = {'Tiphia Sting'},
-        Head = {'Walahra Turban'},
-        Neck = {'Fortitude Torque'},
-        Ear1 = {'Brutal Earring'},
-        Ear2 = {'Spike Earring'}, -- Below, we define a TP_Ear2 priority, however, if you do not have something better than Diabolos' Earring, still set something here for instances when you're in dark weather.
-        Body = {'Morrigan\'s Robe'},
-        Hands = {'Homam Manopolas'},
-        Ring1 = {'Rajas Ring'},
-        Ring2 = {'Sniper\'s Ring'},
-        Back = {'Amemet Mantle +1'},
-        Waist = {'Speed Belt'},
-        Legs = {'Homam Cosciales'},
-        Feet = {'Homam Gambieras'},
-    },
+    TP_LowAcc_Priority = {},
 
     -- If you have an item you'd prefer to use instead of Diabolos' Earring, replace 'Better_Earring_Goes_Here' with the earring name.
     -- It will equip Diabolos' Earring only when not Dark weather and if no other item is listed ahead of it.
@@ -263,12 +180,8 @@ TP_Ear2_Priority = {
 
     -- NOTE: TP_HighAcc_Priority and TP_NIN_Priority below are LAYERED ON TOP of TP_LowAcc_Priority in this
     -- architecture (only the slots that should actually change need to be listed) 
-    TP_HighAcc_Priority = {
-    Waist = {'Life Belt'},
-    },
-    TP_NIN_Priority = {
-    Ear2 = {'Suppanomimi'},
-    },
+    TP_HighAcc_Priority = {},
+    TP_NIN_Priority = {},
     TP_Mjollnir_Haste_Priority = {},
 
     -- Tanking-focused alternatives to TP_LowAcc/TP_HighAcc, cycled through the same /tp command
@@ -283,18 +196,9 @@ TP_Ear2_Priority = {
     -- Weapon_Loadout_2 will auto-equip when SubJob is set to anything that is NOT /NIN, and you are engaged.
     -- Weapon_Loadout_3 will not auto-equip.
     -- You can still manually cycle these sets by typing /wl # in game. (Replace # with the loadout number)
-    Weapon_Loadout_1_Priority = {
-        Main = {'Perdu Hanger'},
-        Sub = {'Ifrit\'s Blade'},
-    },
-    Weapon_Loadout_2_Priority = {
-        Main = {'Perdu Hanger'},
-        Sub = {'Genbu\'s Shield'},
-    },
-    Weapon_Loadout_3_Priority = {
-        Main = { 'Tizona' },
-        Sub = { 'Ifrit\'s Blade' },
-    },
+    Weapon_Loadout_1_Priority = {},
+    Weapon_Loadout_2_Priority = {},
+    Weapon_Loadout_3_Priority = {},
 
 
     Haste = {}, -- used e.g. for NIN subjob Utsusemi recast
@@ -303,31 +207,15 @@ TP_Ear2_Priority = {
     Midshot_Priority = {},
     Ranged_Priority = {},
 
-    Precast_Priority = {
-        Ear1 = {'Loquac. Earring'},
-    },
-    Blu_Precast_Priority = {
-        Ear1 = {'Loquac. Earring'},
-    },
+    -- New in v3.1.3: equipped when using Weapon Bash (/DRK subjob) with a one-handed or
+    -- hand-to-hand weapon. Put a higher-damage weapon here, or leave empty to skip.
+    WeaponBash = {},
+
+    Precast_Priority = {},
+    Blu_Precast_Priority = {},
     Stoneskin_Precast_Priority = {},
 
-    Cure_Priority = {
-        Main = {'Apollo\'s Staff'},
-        Sub = 'displaced',
-        Ammo = {'Hedgehog Bomb'},
-        Head = {'Yigit Turban'},
-        Neck = {'Justice Badge'},
-        Ear1 = {'Loquac. Earring'},
-        Ear2 = {'Cmn. Earring'},
-        Body = {'Errant Hpl.'},
-        Hands = {'Yigit Gages'},
-        Ring1 = {'Aqua Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
+    Cure_Priority = {},
     WhiteWind_Priority = {},
     BluBreath_Priority = {},
     BluSkill_Priority = {
@@ -336,116 +224,31 @@ TP_Ear2_Priority = {
     },
 
     -- This set is your default magical spell set. 
-    BluMagical_Priority = {
-        Ammo = {'Phtm. Tathlum'},
-        Head = {'Morrigan\'s Coron.'},
-        Neck = {'Philomath Stole'},
-        Ear1 = {'Moldavite Earring'},
-        Ear2 = {'Phtm. Earring +1'},
-        Body = {'Morrigan\'s Robe'},
-        Hands = {'Morrigan\'s Cuffs'},
-        Ring1 = {'Snow Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
+    BluMagical_Priority = {},
 
     -- The below sets are layered on top of BluMagical_Priority for magic-damage fallback based on each
     -- spell's dominant stat mod (see BluMagMND/CHR/INT classification above; BluMagical_Priority is still the
     -- fallback default for any spell not explicitly classified in one of those three tables).
-    BluMagical_INT_Priority = {
-        Ammo = {'Phtm. Tathlum'},
-        Head = {'Morrigan\'s Coron.'},
-        Neck = {'Philomath Stole'},
-        Ear1 = {'Moldavite Earring'},
-        Ear2 = {'Phtm. Earring +1'},
-        Body = {'Morrigan\'s Robe'},
-        Hands = {'Morrigan\'s Cuffs'},
-        Ring1 = {'Snow Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
-    BluMagical_MND_Priority = {
-        Head = {'Yigit Turban'},
-        Neck = {'Promise Badge'},
-        Ear1 = {'Cmn. Earring'},
-        Ear2 = {'Cmn. Earring'},
-        Body = {'Errant Hpl.'},
-        Hands = {'Yigit Gages'},
-        Ring1 = {'Aqua Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
-    BluMagical_CHR_Priority = {
-        Ring1 = {'Heavens Ring'},
-        Ring2 = {'Heavens Ring'},
-    },
+    BluMagical_INT_Priority = {},
+    BluMagical_MND_Priority = {},
+    BluMagical_CHR_Priority = {},
 
     -- Layered on top of the base BluMagical_INT/MND/CHR set (instead of it) when /extra mode is on
     -- and you'll still have plenty of MP left after the cast (see extraThreshold) - the BLU-specific
     -- equivalent of what gcmage.lua's NukeExtra/StoneskinExtra/PhalanxExtra would do for other mage
     -- jobs, but self-contained since that mechanism can't reach BLU.
-    BluMagical_INT_Extra_Priority = {
-        Ammo = {'Phtm. Tathlum'},
-        Head = {'Morrigan\'s Coron.'},
-        Neck = {'Philomath Stole'},
-        Ear1 = {'Moldavite Earring'},
-        Ear2 = {'Phtm. Earring +1'},
-        Body = {'Crm. Scale Mail'},
-        Hands = {'Morrigan\'s Cuffs'},
-        Ring1 = {'Astral Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Hierarch Belt'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Morrigan\'s Pgch.'},
-    },
+    BluMagical_INT_Extra_Priority = {},
     BluMagical_MND_Extra_Priority = {},
     BluMagical_CHR_Extra_Priority = {},
 
-    BluMagicAccuracy_Priority = {
-        Ammo = {'Phtm. Tathlum'},
-        Head = {'Morrigan\'s Coron.'},
-        Body = {'Nashira Manteel'},
-        Hands = {'Morrigan\'s Cuffs'},
-        Ring1 = {'Snow Ring'},
-        Ring2 = {'Tamas Ring'},
-        Back = {'Prism Cape'},
-        Waist = {'Penitent\'s Rope'},
-        Legs = {'Nashira Seraweels'},
-        Feet = {'Denali Gamashes'},
-    },
+    BluMagicAccuracy_Priority = {},
     BluStun_Priority = {},
-    BluPhysical_Priority = {
-        Head = {'Morrigan\'s Coron.'},
-        Neck = {'Kubira Beads'},
-        Ear1 = {'Triumph Earring'},
-        Ear2 = {'Triumph Earring'},
-        Body = {'Morrigan\'s Robe'},
-        Hands = {'Alkyoneus\'s Brc.'},
-        Ring1 = {'Rajas Ring'},
-        Ring2 = {'Flame Ring'},
-        Back = {'Forager\'s Mantle'},
-        Waist = {'Warwolf Belt'},
-        Legs = {'Morrigan\'s Slops'},
-        Feet = {'Denali Gamashes'},
-    },
+    BluPhysical_Priority = {},
     -- Layered on top of BluPhysical_Priority based on each spell's dominant secondary stat mod (see
     -- BluPhysSTR/DEX/VIT/AGI/CHR classification above).
     BluPhysical_STR_Priority = {},
     BluPhysical_DEX_Priority = {},
-    BluPhysical_CHR_Priority = {
-        Ring1 = {'Heavens Ring'},
-        Ring2 = {'Heavens Ring'},
-    },
+    BluPhysical_CHR_Priority = {},
     BluPhysical_AGI_Priority = {},
     BluPhysical_VIT_Priority = {},
     ConserveMP_Priority = {},
@@ -457,36 +260,10 @@ TP_Ear2_Priority = {
     Vorpal_Default_Priority = {},
     Vorpal_HighAcc_Priority = {},
 
-    Savage_Default_Priority = {
-        Head = 'Morrigan\'s Coron.',
-        Neck = 'Kubira Beads',
-        Ear1 = 'Triumph Earring',
-        Ear2 = 'Triumph Earring',
-        Body = 'Morrigan\'s Robe',
-        Hands = 'Alkyoneus\'s Brc.',
-        Ring1 = 'Rajas Ring',
-        Ring2 = 'Flame Ring',
-        Back = 'Forager\'s Mantle',
-        Waist = 'Warwolf Belt',
-        Legs = 'Morrigan\'s Slops',
-        Feet = 'Denali Gamashes',
-    },
+    Savage_Default_Priority = {},
     Savage_HighAcc_Priority = {},
 
-    Expiacion_Default_Priority = {
-        Head = 'Morrigan\'s Coron.',
-        Neck = 'Kubira Beads',
-        Ear1 = 'Triumph Earring',
-        Ear2 = 'Triumph Earring',
-        Body = 'Morrigan\'s Robe',
-        Hands = 'Alkyoneus\'s Brc.',
-        Ring1 = 'Rajas Ring',
-        Ring2 = 'Flame Ring',
-        Back = 'Forager\'s Mantle',
-        Waist = 'Warwolf Belt',
-        Legs = 'Morrigan\'s Slops',
-        Feet = 'Denali Gamashes',
-    },
+    Expiacion_Default_Priority = {},
     Expiacion_HighAcc_Priority = {},
 
     RedLotusBlade_Default_Priority = {},
@@ -562,7 +339,15 @@ end
 -- is used instead. See HandleCommand for how the override gets set/cleared.
 local function GetAutoWeaponLoadout()
     if (weaponLoadoutManualOverride) then
-        return gcdisplay.GetCycle('Weapon Loadout')
+        -- gcdisplay.GetCycle returns the literal string 'Unknown' when the cycle hasn't been populated
+        -- yet (e.g. on initial game load, before gcmage.Load registers it). Building a set name from
+        -- that would ask for 'Weapon_Loadout_Unknown' and log a "Set not found" warning, so fall back
+        -- to the SubJob default until the cycle is live. Upstream added the equivalent guard to
+        -- gcmage/gcmelee in v3.1.1; this is the same fix for our own loadout selection.
+        local cycle = gcdisplay.GetCycle('Weapon Loadout')
+        if (cycle ~= nil and cycle ~= 'Unknown') then
+            return cycle
+        end
     end
 
     local player = gData.GetPlayer()
@@ -577,6 +362,17 @@ end
 -- gear independently (which can include its own Hands item), so the override has to be re-asserted in
 -- all three or it would only hold between casts. Excluded while Resting - Resting_Priority's own Hands
 -- choice always wins there regardless of the toggle.
+-- gcmage's DoDefault/DoMidcast only give WHM, BLM, RDM and DRK a dedicated MaxMP parameter; their
+-- final 'else' branch is a catch-all that every other subjob falls into, and it reads the first
+-- parameter (named ninSJMMP upstream). So to give THF its own threshold we just decide which value
+-- to hand to that catch-all slot rather than changing gcmage at all.
+local function GetCatchAllSJMaxMP()
+    if (gData.GetPlayer().SubJob == 'THF' and thfSJMaxMP ~= nil) then
+        return thfSJMaxMP
+    end
+    return ninSJMaxMP
+end
+
 local function ApplyAFHands()
     if (gcdisplay.GetToggle('AFHands') and gData.GetPlayer().Status ~= 'Resting') then
         gFunc.EquipSet('AFHands')
@@ -763,6 +559,8 @@ profile.HandleAbility = function()
 
     local ability = gData.GetAction()
     if (string.match(ability.Name, 'Provoke')) then gFunc.EquipSet('Enmity') end
+
+    gcmage.DoWeaponBash()
 end
 
 profile.HandleItem = function()
@@ -818,7 +616,7 @@ profile.HandleDefault = function()
     local player = gData.GetPlayer()
     local zone = gData.GetEnvironment()
 
-    gcmage.DoDefault(sets, ninSJMaxMP, whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
+    gcmage.DoDefault(sets, GetCatchAllSJMaxMP(), whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
 
     -- Deliberately calls gcinclude.DoDefaultOverride directly rather than gcmage.DoDefaultOverride.
     -- The gcmage wrapper adds a MaxMP-Resting feature that, above 95% MP, re-equips Idle gear plus an
@@ -1047,7 +845,7 @@ profile.HandleMidcast = function()
         -- gcmage.DoMidcast dispatch RDM/WHM/BLM/SMN/BRD use, rather than us hand-rolling a branch for
         -- every possible subjob spell here. Requires SIRD/SIRD_NIN to exist in the sets table above
         -- (direct field access, not the bare-name alias mechanism) or this crashes for NIN subs.
-        gcmage.DoMidcast(sets, ninSJMaxMP, whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
+        gcmage.DoMidcast(sets, GetCatchAllSJMaxMP(), whmSJMaxMP, blmSJMaxMP, rdmSJMaxMP, drkSJMaxMP)
 
         -- Self-contained Extra mode extension for Stoneskin/Phalanx (Enhancing Magic spells reachable
         -- via a subjob through the DoMidcast fallback above). gcmage.lua's own StoneskinExtra/
