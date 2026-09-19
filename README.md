@@ -10,10 +10,10 @@ I will also be pinging the discord server with updates to the LUA so I encourage
 
 **Now some disclaimers:**
 - Claude did a lot of the work in creating the BLU.lua so there is absolutely a possibility of redundant code, weird workarounds for problems, etc. I've made efforts to clean it up, but AI gonna AI.
-- This file is based off of the 3.0.5 version of Rag's files. You need to be on at least 3.0.0 I believe. He continues to make updates, though, but from what I can tell, unless Rag makes some big logic changes (unlikely), later versions are likely to work as well.
+- This file is based off of the 3.1.3 version of Rag's files. You need to be on at least 3.1.3 to not encounter any issues/errors. Rag continues to make updates to his files and over time updating his files will be required for this LUA to properly function without issues.
 - This lua was originally developed with in-era knowledge, and has been being changed as we learn new era+ things from HXI such as the new Metallic Body formula. You'll want to keep notifications on for updates, or at least check the #version-updates page weekly to make sure you don't miss out on import updates or hotfixes.
-- The gear sets used in this LUA are placeholders from testing. They are definitely not perfect, and are using stuff like Morrigan's set which we won't have as of time of release of this file on Horizon XI. Obviously you'll need to make your own changes there. **Please pay special notice to any comments added to gearsets, though!**
-- This lua is set up to work with the level sync priority feature LuAshitacast utilizes, so you can add gear in like this: `Main = {'Perdu Hanger', 'Centurion\'s Sword', 'Fire Sword'},` and it will try to equip each sequentially until it lands on one you can equip.
+- The gear sets are left empty except for a select few that were pre-defined due to their usecase (such as the AFHands set). **Please pay special notice to any comments added to gearsets, though!**
+- This lua is set up to work with the level sync priority feature LuAshitacast utilizes, so you can add gear in like this: `Main = {'Perdu Hanger', 'Centurion\'s Sword', 'Fire Sword'},` and it will try to equip each sequentially until it lands on one you can equip. Any sets that do not have the `_Priority` suffix, though, you will want to keep gear out of brackets (`Main = 'Perdu Hanger` instead of `Main = {'Perdu Hanger'}`).
 
 - Reference the Commands.md file to understand all relevant commands for this lua.
 - Reference the Update-Instructions.md file for instructions on how to properly update from older versions.
