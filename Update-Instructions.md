@@ -2,6 +2,32 @@
 
 ## Latest
 
+**New**
+- Warlock's Mantle support, matching WHM.lua and BLM.lua. While subbing /RDM it's equipped
+  during precast and its 2% Fast Cast is added on top of `fastCastValue` for the cast-delay
+  calculation. The 2% can't be folded into `fastCastValue` directly because it only applies
+  on that one subjob. Comment out the `Back` line in the `warlocks_mantle` table near the
+  top of the file to disable it if you don't own the mantle.
+
+**Fixes**
+- The cure cheat now actually works. `Cheat_HPUp` was applied during precast, but the Cure
+  and Enmity sets land afterwards and overwrote its slots - and since the HP the cure heals
+  is (max HP at resolution - current HP), only the gear worn when the spell resolves counts.
+  The HP-up half was therefore doing nothing. `Cheat_HPUp` is now re-applied at the very end
+  of midcast, after Cure and Enmity, via `ApplyCheatHPUp()`. This mirrors how PLD.lua does
+  the same trick.
+  - Trade-off, which PLD accepts too: `Cheat_HPUp`'s slots now override your Enmity gear in
+    those slots. That swaps a little enmity-from-gear for a bigger cure, which is usually
+    the better deal since cure enmity scales with HP actually healed.
+
+**Notes**
+- Added guidance in the sets table recommending the `{ Name = 'Item', Priority = 60 }`
+  syntax for the three `Cheat_*` sets. Priority controls equip *order* within a single swap
+  (higher goes on first), so putting +HP gear on before -HP gear comes off stops max HP
+  dipping mid-swap and clamping away HP you didn't intend to lose. These three sets are
+  bare-named and never pass through `gFunc.EvaluateLevels`, so unlike the `_Priority`-suffixed
+  sets they can use that syntax.
+
 **Spell table additions**
 - New `BluMagDEX` table and matching `BluMagical_DEX_Priority` /
   `BluMagical_DEX_Extra_Priority` sets, wired into both the magical stat dispatch and
@@ -12,7 +38,9 @@
 - `BluMagINT` += Blastbomb, Leafstorm, Thermal Pulse, Water Bomb, Dark Orb.
 
 **Fixes**
-- Corrected `'CMain Wave'` in `BluMagDebuff` to `'Cold Wave'`. 
+- Corrected `'CMain Wave'` in `BluMagDebuff` to `'Cold Wave'`. The original looked like a
+  find-and-replace accident (`old` -> `Main` inside "Cold Wave"), which meant Cold Wave was
+  never actually matching and the bogus name could never match anything.
 
 **New**
 - `thfSJMaxMP` - a dedicated IdleMaxMP threshold for a THF subjob. gcmage only gives WHM,
