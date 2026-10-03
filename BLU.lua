@@ -3,6 +3,15 @@ local profile = {}
 -- Approximate Fast Cast % from gear listed in the Precast set below. Adjust if you change that set.
 local fastCastValue = 0
 
+-- Comment out the equipment within this set if you do not have it or do not wish to use it.
+-- Warlock's Mantle gives 2% Fast Cast but only while subbing /RDM, so it can't be folded into
+-- fastCastValue above - HandlePrecast adds the 2% on top only when the mantle is actually going on.
+-- Matches how WHM.lua and BLM.lua handle it. The `.Back` check below is what makes commenting the
+-- line out cleanly disable the whole thing.
+local warlocks_mantle = {
+    Back = 'Warlock\'s Mantle',
+}
+
 -- These mirror gcmage.DoDefault's subjob MaxMP convenience params (see RDM.lua). BLU commonly subs
 -- NIN, which has no MP-conservation idle gear convention like WHM/BLM/RDM/DRK subs do, so these are
 -- left nil (disabled) by default. Fill in a value here if you want IdleMaxMP gear at a specific
@@ -121,13 +130,27 @@ local sets = {
     SIRD = {},
     SIRD_NIN = {},
 
-    -- "Cure cheat" sets, used by ApplyCheatCure when /hate is on and you cure YOURSELF. Your HP is
-    -- briefly dropped so the cure heals for more (and generates more enmity), then restored just before
-    -- the cast lands. Leave empty to disable. Also read directly by gcmage.lua, so they must exist by
-    -- these exact bare names even if unused.
+    -- "Cure cheat" sets, used when /hate is on and you cure YOURSELF. Dropping max HP clamps your
+    -- current HP down; raising it again leaves you "missing" that HP, so the cure heals the full gap
+    -- and generates maximum enmity. Leave empty to disable. Also read directly by gcmage.lua, so they
+    -- must exist by these exact bare names even if unused.
+    --
+    -- RECOMMENDED: use the Priority syntax in these three sets - { Name = 'Item', Priority = 60 }.
+    -- Priority controls the ORDER items are equipped within a single swap (higher goes on first), so
+    -- putting +HP gear on before -HP gear comes off stops your max HP dipping mid-swap and clamping
+    -- away HP you didn't mean to lose. The suggested scale from the framework's own New-User.md:
+    --     +HP and +MP = 70   |   +HP = 60   |   +MP = 50   |   -MP = -10   |   -HP = -20
+    -- Unlike the _Priority-suffixed sets elsewhere in this file, these three are bare-named and never
+    -- go through gFunc.EvaluateLevels, so the Priority syntax works here. Example:
+    --     Cheat_HPUp = {
+    --         Head = { Name = 'Twilight Helm', Priority = 60 },
+    --         Body = { Name = 'Twilight Mail', Priority = 60 },
+    --     },
     Cheat_C3HPDown = {}, -- Cure III, and Wild Carrot
     Cheat_C4HPDown = {}, -- Cure IV, and Magic Fruit
-    Cheat_HPUp = {},     -- applied on top of either, just before the cast completes
+    -- Avoid putting HP gear in Main/Sub/Range/Ammo here: LockTPWeapon runs after this and will
+    -- reclaim those four slots whenever you're holding TP with the /tp cycle on.
+    Cheat_HPUp = {},     -- re-applied last in midcast, after Cure and Enmity - see ApplyCheatHPUp
 
     -- Forced into the Hands slot by /afhands (see HandleDefault) while idle or engaged.
     AFHands_Priority = {
@@ -319,6 +342,8 @@ sets.Hate_Flash = sets.Enmity_Priority
 sets.Support_Flash = sets.Enmity_Priority
 sets.TP = sets.TP_LowAcc_Priority
 
+sets.warlocks_mantle = warlocks_mantle
+
 profile.Sets = gcmelee.AppendSets(gcmage.AppendSets(sets))
 
 -- Casting a spell mid-fight normally swaps Main/Sub/Range/Ammo to whatever the cast's gear set
@@ -448,6 +473,24 @@ local function ApplyCheatCure(action, castDelay)
     else
         doCheat:once(cheatDelay)
     end
+end
+
+-- Second half of the cure cheat. ApplyCheatCure (above) drops max HP during the cast, but the midcast
+-- Cure and Enmity sets land AFTER it and would overwrite those slots - and since the missing HP that
+-- the cure heals is (max HP at resolution - current HP), whatever is worn when the spell resolves is
+-- what counts. So Cheat_HPUp is applied again here, last, to restore max HP after Cure and Enmity are
+-- on. PLD.lua does exactly the same thing for its own cure cheat. Note this means Cheat_HPUp's slots
+-- override your Enmity gear in those slots: that trades a little enmity-from-gear for a bigger cure,
+-- which is normally the better deal since cure enmity scales with HP actually healed.
+local function ApplyCheatHPUp(action)
+    if (gcdisplay.GetToggle('Hate') ~= true) then return end
+    if (not CheatC3Spells:contains(action.Name) and not CheatC4Spells:contains(action.Name)) then return end
+
+    local target = gData.GetActionTarget()
+    local me = AshitaCore:GetMemoryManager():GetParty():GetMemberName(0)
+    if (target == nil or target.Name ~= me) then return end
+
+    gFunc.EquipSet('Cheat_HPUp')
 end
 
 local function LockTPWeapon()
@@ -721,6 +764,7 @@ end
 
 profile.HandlePrecast = function()
     local action = gData.GetAction()
+    local player = gData.GetPlayer()
 
     gFunc.EquipSet('Precast')
     if (string.contains(action.Skill, 'Blue Magic')) then
@@ -729,7 +773,16 @@ profile.HandlePrecast = function()
         gFunc.EquipSet('Stoneskin_Precast')
     end
 
-    local castDelay = ((action.CastTime * (1 - fastCastValue)) / 1000) - 0.4
+    -- Warlock's Mantle: 2% Fast Cast, but only while subbing /RDM, so the bonus is applied here
+    -- rather than being baked into fastCastValue. Equipped after the Precast sets so it wins the
+    -- Back slot, and the cast delay below is calculated with the extra 2% accounted for.
+    local effectiveFastCast = fastCastValue
+    if (player.SubJob == 'RDM' and warlocks_mantle.Back) then
+        effectiveFastCast = fastCastValue + 0.02
+        gFunc.EquipSet('warlocks_mantle')
+    end
+
+    local castDelay = ((action.CastTime * (1 - effectiveFastCast)) / 1000) - 0.4
     if (castDelay >= 0.25) then
         gFunc.SetMidDelay(castDelay)
         gcinclude.DoCancel(action, castDelay - 0.4)
@@ -868,6 +921,7 @@ profile.HandleMidcast = function()
     ApplyAFHands()
     ApplyRefBody()
     ApplyHate(action)
+    ApplyCheatHPUp(action) -- must stay last: it needs the final word on max HP (see above)
 
     LockTPWeapon()
 end
